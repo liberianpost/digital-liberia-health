@@ -57,7 +57,7 @@ const requestNotificationPermission = async () => {
   }
 };
 
-// API configuration - USING EXACT SAME API BASE AND ENDPOINTS
+// API configuration - UPDATED: Remove credentials to fix CORS issue
 const API_BASE = 'https://libpayapp.liberianpost.com:8081';
 
 const api = {
@@ -68,7 +68,7 @@ const api = {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
-      credentials: 'include',
+      // REMOVED: credentials: 'include' to fix CORS wildcard issue
     });
     
     if (!response.ok) {
@@ -80,7 +80,7 @@ const api = {
   
   get: async (url) => {
     const response = await fetch(`${API_BASE}${url}`, {
-      credentials: 'include',
+      // REMOVED: credentials: 'include' to fix CORS wildcard issue
     });
     
     if (!response.ok) {
