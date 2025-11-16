@@ -91,24 +91,6 @@ const api = {
   }
 };
 
-// Function to fetch user profile - EXACT SAME FUNCTION
-const fetchUserProfile = async (dssn) => {
-  try {
-    const response = await api.get(`/profile-by-dssn?dssn=${dssn}`);
-    
-    // Check if the response is successful and has data
-    if (response.success && response.data) {
-      console.log('User profile fetched successfully:', response.data);
-      return response.data; // Return the data object directly
-    } else {
-      throw new Error(response.message || 'Failed to fetch user profile');
-    }
-  } catch (error) {
-    console.error('Error fetching user profile:', error);
-    throw new Error('Failed to fetch user profile: ' + error.message);
-  }
-};
-
 function Login({ onLoginSuccess, onBack }) {
   const [dssn, setDssn] = useState("");
   const [error, setError] = useState("");
@@ -169,7 +151,7 @@ function Login({ onLoginSuccess, onBack }) {
     }
   };
 
-  // UPDATED HANDLE SUBMIT LOGIC - Removed role-based access check
+  // SIMPLIFIED HANDLE SUBMIT LOGIC - No role check, no profile fetch
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -207,47 +189,20 @@ function Login({ onLoginSuccess, onBack }) {
             setPolling(false);
             console.log('Health system login approved with token:', statusResponse.govToken);
             
-            // Fetch user profile after successful login - EXACT SAME PROFILE FETCH
-            try {
-              const userProfile = await fetchUserProfile(dssn);
-              console.log('User profile fetched successfully:', userProfile);
-              
-              // Call the success callback with complete user data - UPDATED structure for health context
-              onLoginSuccess({
-                dssn: dssn,
-                govToken: statusResponse.govToken,
-                challengeId: response.challengeId,
-                profile: {
-                  // Map backend fields to frontend expected structure
-                  firstName: userProfile.first_name,
-                  lastName: userProfile.last_name,
-                  email: userProfile.email,
-                  phone: userProfile.phone,
-                  photo: userProfile.image,
-                  address: userProfile.address,
-                  postalAddress: userProfile.postal_address,
-                  userId: userProfile.user_id,
-                  dssn: userProfile.DSSN,
-                  institution_of_work: userProfile.institution_of_work,
-                  position: userProfile.position,
-                  role_base: userProfile.role_base,
-                  // Include all original data for debugging
-                  rawData: userProfile
-                },
-                timestamp: new Date().toISOString()
-              });
-              
-            } catch (profileError) {
-              console.error('Error fetching profile, proceeding with basic user data:', profileError);
-              // Still proceed with login even if profile fetch fails
-              onLoginSuccess({
-                dssn: dssn,
-                govToken: statusResponse.govToken,
-                challengeId: response.challengeId,
-                profile: null,
-                timestamp: new Date().toISOString()
-              });
-            }
+            // Direct success callback without profile fetch
+            onLoginSuccess({
+              dssn: dssn,
+              govToken: statusResponse.govToken,
+              challengeId: response.challengeId,
+              profile: {
+                firstName: "Medical",
+                lastName: "Professional", 
+                email: "",
+                phone: "",
+                dssn: dssn
+              },
+              timestamp: new Date().toISOString()
+            });
             
           } else if (statusResponse.status === 'denied') {
             clearInterval(interval);
