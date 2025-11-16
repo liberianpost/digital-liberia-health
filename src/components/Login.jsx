@@ -58,7 +58,7 @@ const requestNotificationPermission = async () => {
 };
 
 // API configuration for health system
-const API_BASE = 'https://health.digitalliberia.com:8081';
+const API_BASE = 'https://libpay.liberianpost.com:8081';
 
 const api = {
   post: async (url, data) => {
