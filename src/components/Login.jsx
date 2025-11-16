@@ -91,23 +91,6 @@ const api = {
   }
 };
 
-// Function to check if user has role-based access - EXACT SAME FUNCTION
-const checkRoleBaseAccess = async (dssn) => {
-  try {
-    const response = await api.post('/check-role-access', { dssn });
-    
-    if (response.success && response.data) {
-      console.log('Role-based access verified:', response.data);
-      return response.data;
-    } else {
-      throw new Error(response.error || 'Access denied. No role-based permissions found.');
-    }
-  } catch (error) {
-    console.error('Error checking role access:', error);
-    throw new Error('Failed to verify access permissions: ' + error.message);
-  }
-};
-
 // Function to fetch user profile - EXACT SAME FUNCTION
 const fetchUserProfile = async (dssn) => {
   try {
@@ -155,8 +138,7 @@ function Login({ onLoginSuccess, onBack }) {
         requestData: {
           timestamp: new Date().toISOString(),
           service: "Digital Liberia Health System - Medical Access", // Updated service name
-          origin: window.location.origin,
-          requiresRoleBase: true
+          origin: window.location.origin
         }
       });
       
@@ -187,7 +169,7 @@ function Login({ onLoginSuccess, onBack }) {
     }
   };
 
-  // EXACT SAME HANDLE SUBMIT LOGIC - Only updated messages for health context
+  // UPDATED HANDLE SUBMIT LOGIC - Removed role-based access check
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -201,15 +183,7 @@ function Login({ onLoginSuccess, onBack }) {
     }
 
     try {
-      // EXACT SAME ROLE ACCESS CHECK
-      console.log('Checking role-based access for DSSN:', dssn);
-      const roleAccess = await checkRoleBaseAccess(dssn);
-      
-      if (!roleAccess.hasAccess) {
-        throw new Error('Healthcare access denied. You do not have medical permissions for this system.');
-      }
-
-      console.log('Role access verified, proceeding with DSSN challenge...');
+      console.log('Initiating healthcare DSSN challenge for:', dssn);
       
       const response = await requestDSSNChallenge(dssn);
       setChallengeId(response.challengeId);
@@ -260,7 +234,6 @@ function Login({ onLoginSuccess, onBack }) {
                   // Include all original data for debugging
                   rawData: userProfile
                 },
-                roleAccess: roleAccess, // Include role access information
                 timestamp: new Date().toISOString()
               });
               
@@ -272,7 +245,6 @@ function Login({ onLoginSuccess, onBack }) {
                 govToken: statusResponse.govToken,
                 challengeId: response.challengeId,
                 profile: null,
-                roleAccess: roleAccess, // Include role access information
                 timestamp: new Date().toISOString()
               });
             }
@@ -332,7 +304,7 @@ function Login({ onLoginSuccess, onBack }) {
             fontSize: '0.9rem',
             color: 'var(--success-color)'
           }}>
-            🔒 Role-based healthcare access required. Only authorized medical professionals can login.
+            🔐 Secure healthcare access for authorized medical professionals
           </div>
         </div>
         
@@ -420,27 +392,16 @@ function Login({ onLoginSuccess, onBack }) {
           )}
 
           <div className="login-footer">
-            <p className="mobile-app-info">
-              Don't have the mobile app?{' '}
-              <a 
-                href="#" 
-                onClick={(e) => {
-                  e.preventDefault();
-                  alert("The Digital Liberia mobile app is available on the App Store and Google Play Store");
-                }}
-              >
-                Download it here
-              </a>
-            </p>
             <p className="access-info" style={{ 
               color: 'var(--text-light)', 
               fontSize: '0.8rem',
               marginTop: '1.5rem',
               background: 'rgba(0,0,0,0.05)',
               padding: '0.8rem',
-              borderRadius: '8px'
+              borderRadius: '8px',
+              textAlign: 'center'
             }}>
-              🔐 This healthcare system requires role-based medical professional permissions.
+              🏥 Secure healthcare system for medical professionals
             </p>
           </div>
         </div>
