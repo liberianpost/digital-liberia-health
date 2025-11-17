@@ -137,31 +137,70 @@ function App() {
                 secure patient records, and real-time medical services.
               </p>
 
-              {/* Health Features Grid */}
+              {/* Enhanced Health Features Grid with Floating Animations */}
               <div className="health-features-grid">
-                <div className="health-feature-item">
-                  <div className="health-feature-icon">📊</div>
+                {/* Patient Records Card */}
+                <div className="health-feature-item floating" style={{
+                  background: 'linear-gradient(135deg, rgba(0, 212, 170, 0.15), rgba(17, 138, 178, 0.1))',
+                  border: '1px solid rgba(0, 212, 170, 0.3)',
+                  backdropFilter: 'blur(20px)',
+                  animationDelay: '0s'
+                }}>
+                  <div className="health-feature-icon" style={{
+                    background: 'linear-gradient(135deg, #00d4aa, #118ab2)',
+                    boxShadow: '0 8px 25px rgba(0, 212, 170, 0.4)'
+                  }}>📊</div>
                   <div className="health-feature-content">
                     <h4>Patient Records</h4>
                     <p>Secure digital health records with instant access for authorized medical professionals</p>
                   </div>
                 </div>
-                <div className="health-feature-item">
-                  <div className="health-feature-icon">💊</div>
+
+                {/* Pharmacy Management Card */}
+                <div className="health-feature-item floating" style={{
+                  background: 'linear-gradient(135deg, rgba(114, 9, 183, 0.15), rgba(58, 134, 255, 0.1))',
+                  border: '1px solid rgba(114, 9, 183, 0.3)',
+                  backdropFilter: 'blur(20px)',
+                  animationDelay: '0.2s'
+                }}>
+                  <div className="health-feature-icon" style={{
+                    background: 'linear-gradient(135deg, #7209b7, #3a86ff)',
+                    boxShadow: '0 8px 25px rgba(114, 9, 183, 0.4)'
+                  }}>💊</div>
                   <div className="health-feature-content">
                     <h4>Pharmacy Management</h4>
                     <p>Real-time medication tracking and prescription management system</p>
                   </div>
                 </div>
-                <div className="health-feature-item">
-                  <div className="health-feature-icon">🩺</div>
+
+                {/* Telemedicine Card */}
+                <div className="health-feature-item floating" style={{
+                  background: 'linear-gradient(135deg, rgba(239, 71, 111, 0.15), rgba(255, 209, 102, 0.1))',
+                  border: '1px solid rgba(239, 71, 111, 0.3)',
+                  backdropFilter: 'blur(20px)',
+                  animationDelay: '0.4s'
+                }}>
+                  <div className="health-feature-icon" style={{
+                    background: 'linear-gradient(135deg, #ef476f, #ffd166)',
+                    boxShadow: '0 8px 25px rgba(239, 71, 111, 0.4)'
+                  }}>🩺</div>
                   <div className="health-feature-content">
                     <h4>Telemedicine</h4>
                     <p>Virtual consultations and remote patient monitoring capabilities</p>
                   </div>
                 </div>
-                <div className="health-feature-item">
-                  <div className="health-feature-icon">🚑</div>
+
+                {/* Emergency Response Card */}
+                <div className="health-feature-item floating" style={{
+                  background: 'linear-gradient(135deg, rgba(255, 77, 77, 0.15), rgba(255, 122, 0, 0.1))',
+                  border: '1px solid rgba(255, 77, 77, 0.3)',
+                  backdropFilter: 'blur(20px)',
+                  animationDelay: '0.6s'
+                }}>
+                  <div className="health-feature-icon" style={{
+                    background: 'linear-gradient(135deg, #ff4d4d, #ff7a00)',
+                    boxShadow: '0 8px 25px rgba(255, 77, 77, 0.4)'
+                  }}>🚑</div>
                   <div className="health-feature-content">
                     <h4>Emergency Response</h4>
                     <p>Rapid emergency services coordination and ambulance dispatch</p>
@@ -208,33 +247,34 @@ function App() {
                   right: 0,
                   bottom: 0,
                   background: `linear-gradient(45deg, 
-                    rgba(0, 212, 170, 0.05) 0%, 
-                    rgba(17, 138, 178, 0.05) 50%, 
-                    rgba(114, 9, 183, 0.05) 100%)`,
+                    rgba(239, 71, 111, 0.08) 0%, 
+                    rgba(255, 77, 77, 0.08) 50%, 
+                    rgba(255, 122, 0, 0.08) 100%)`,
                   zIndex: 0
                 }}></div>
                 
+                {/* Red Love Sign */}
                 <div 
                   style={{
                     fontSize: '6rem',
                     marginBottom: '2rem',
-                    background: 'var(--health-gradient)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
+                    color: '#ef476f',
+                    filter: 'drop-shadow(0 4px 12px rgba(239, 71, 111, 0.4))',
                     position: 'relative',
-                    zIndex: 1
+                    zIndex: 1,
+                    animation: 'pulse 2s ease-in-out infinite'
                   }}
                 >
                   ❤️
                 </div>
                 <h3 style={{ 
-                  color: 'var(--text-dark)', 
+                  color: '#ef476f', 
                   marginBottom: '1rem',
                   fontSize: '1.5rem',
                   fontWeight: '700',
                   position: 'relative',
-                  zIndex: 1
+                  zIndex: 1,
+                  textShadow: '0 2px 4px rgba(239, 71, 111, 0.2)'
                 }}>
                   Your Health, Our Priority
                 </h3>
@@ -252,8 +292,8 @@ function App() {
                   position: 'absolute',
                   top: '1rem',
                   right: '1rem',
-                  background: 'rgba(0, 212, 170, 0.1)',
-                  border: '1px solid rgba(0, 212, 170, 0.3)',
+                  background: 'rgba(239, 71, 111, 0.1)',
+                  border: '1px solid rgba(239, 71, 111, 0.3)',
                   borderRadius: '8px',
                   padding: '0.5rem 0.8rem',
                   display: 'flex',
@@ -264,7 +304,7 @@ function App() {
                   <span style={{ fontSize: '1.2rem' }}>🇱🇷</span>
                   <span style={{ 
                     fontSize: '0.8rem', 
-                    color: 'var(--success-color)',
+                    color: '#ef476f',
                     fontWeight: '600'
                   }}>
                     LIBERIA
@@ -363,10 +403,19 @@ function App() {
                 </span>
               </div>
               
-              {/* Health Action Grid for Logged-in Users */}
+              {/* Enhanced Health Action Grid for Logged-in Users */}
               <div className="health-action-grid">
-                <div className="health-action-card">
-                  <div className="health-card-icon">📋</div>
+                {/* Patient Records Card */}
+                <div className="health-action-card floating" style={{
+                  background: 'linear-gradient(135deg, rgba(0, 212, 170, 0.15), rgba(17, 138, 178, 0.1))',
+                  border: '1px solid rgba(0, 212, 170, 0.3)',
+                  backdropFilter: 'blur(20px)',
+                  animationDelay: '0s'
+                }}>
+                  <div className="health-card-icon" style={{
+                    background: 'linear-gradient(135deg, #00d4aa, #118ab2)',
+                    boxShadow: '0 15px 30px rgba(0, 212, 170, 0.4)'
+                  }}>📋</div>
                   <h3 className="health-card-title">Patient Records</h3>
                   <p className="health-card-description">
                     Access and manage comprehensive patient health records and medical history
@@ -376,8 +425,17 @@ function App() {
                   </button>
                 </div>
                 
-                <div className="health-action-card">
-                  <div className="health-card-icon">💉</div>
+                {/* Medical Services Card */}
+                <div className="health-action-card floating" style={{
+                  background: 'linear-gradient(135deg, rgba(114, 9, 183, 0.15), rgba(58, 134, 255, 0.1))',
+                  border: '1px solid rgba(114, 9, 183, 0.3)',
+                  backdropFilter: 'blur(20px)',
+                  animationDelay: '0.2s'
+                }}>
+                  <div className="health-card-icon" style={{
+                    background: 'linear-gradient(135deg, #7209b7, #3a86ff)',
+                    boxShadow: '0 15px 30px rgba(114, 9, 183, 0.4)'
+                  }}>💉</div>
                   <h3 className="health-card-title">Medical Services</h3>
                   <p className="health-card-description">
                     Schedule appointments, manage treatments, and coordinate care services
@@ -387,8 +445,17 @@ function App() {
                   </button>
                 </div>
                 
-                <div className="health-action-card">
-                  <div className="health-card-icon">📊</div>
+                {/* Health Analytics Card */}
+                <div className="health-action-card floating" style={{
+                  background: 'linear-gradient(135deg, rgba(46, 191, 145, 0.15), rgba(131, 96, 195, 0.1))',
+                  border: '1px solid rgba(46, 191, 145, 0.3)',
+                  backdropFilter: 'blur(20px)',
+                  animationDelay: '0.4s'
+                }}>
+                  <div className="health-card-icon" style={{
+                    background: 'linear-gradient(135deg, #2ebf91, #8360c3)',
+                    boxShadow: '0 15px 30px rgba(46, 191, 145, 0.4)'
+                  }}>📊</div>
                   <h3 className="health-card-title">Health Analytics</h3>
                   <p className="health-card-description">
                     Advanced analytics and reporting for healthcare insights and trends
