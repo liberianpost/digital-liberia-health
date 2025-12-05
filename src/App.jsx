@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import ProfessionalVerificationModal from './ProfessionalVerificationModal'; // You'll create this component
 
 // Configure axios for health system API
 const healthApi = axios.create({
@@ -37,7 +38,7 @@ healthApi.interceptors.response.use(
   }
 );
 
-// Firebase configuration - USING EXACT SAME CONFIG AS WORKING PROJECT
+// Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyA4NndmuQHTCKh7IyQYAz3DL_r8mttyRYg",
   authDomain: "digitalliberia-notification.firebaseapp.com",
@@ -58,6 +59,11 @@ function App() {
   const [verificationData, setVerificationData] = useState(null);
   const [showMobileAuth, setShowMobileAuth] = useState(false);
   const [mobileChallengeId, setMobileChallengeId] = useState(null);
+  const [polling, setPolling] = useState(false);
+  const [pollInterval, setPollInterval] = useState(null);
+  const [showProfessionalModal, setShowProfessionalModal] = useState(false);
+  const [pendingLogin, setPendingLogin] = useState(null);
+  const [fcmToken, setFcmToken] = useState(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -76,9 +82,42 @@ function App() {
       }
     }
 
+    // Initialize Firebase
+    initializeFirebase();
+
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
   }, []);
+
+  const initializeFirebase = async () => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      try {
+        const { initializeApp } = await import('firebase/app');
+        const { getMessaging, getToken } = await import('firebase/messaging');
+        
+        const app = initializeApp(firebaseConfig);
+        const messaging = getMessaging(app);
+        
+        // Request notification permission
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          const vapidKey = "BEICu1bx8LKW5j7cag5tU9B2qfcejWi7QPm8a95jFODSIUNRiellygLGroK9NyWt-3WsTiUZscmS311gGXiXV7Q";
+          const currentToken = await getToken(messaging, { vapidKey });
+          if (currentToken) {
+            setFcmToken(currentToken);
+            localStorage.setItem('fcmToken', currentToken);
+          }
+        }
+      } catch (error) {
+        console.log('Firebase initialization error:', error);
+      }
+    }
+  };
 
   const handleLoginSuccess = (userData, token) => {
     setUser(userData);
@@ -88,6 +127,11 @@ function App() {
     localStorage.setItem('health_user', JSON.stringify(userData));
     setSuccess({ message: 'Login successful!' });
     setError(null);
+    setPolling(false);
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      setPollInterval(null);
+    }
   };
 
   const handleLogout = () => {
@@ -104,6 +148,7 @@ function App() {
     setSuccess(null);
     setVerificationData(null);
     setShowMobileAuth(false);
+    setPolling(false);
   };
 
   const handleBackToHome = () => {
@@ -112,6 +157,7 @@ function App() {
     setSuccess(null);
     setVerificationData(null);
     setShowMobileAuth(false);
+    setPolling(false);
   };
 
   const handleDSSNVerify = async (dssn, moduleType) => {
@@ -179,7 +225,7 @@ function App() {
     }
   };
 
-  // Mobile App Notification Authentication
+  // Enhanced Mobile Notification Authentication for Healthcare Professionals
   const handleMobileAuth = async (dssn, moduleType) => {
     setLoading(true);
     setError(null);
@@ -187,47 +233,96 @@ function App() {
     setShowMobileAuth(true);
 
     try {
-      // Here you would integrate with your Firebase notification system
-      // For now, we'll simulate sending a notification
-      const challengeId = `CHALLENGE_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      setMobileChallengeId(challengeId);
+      // Request mobile authentication
+      const response = await healthApi.post('/mobile-auth/request', {
+        dssn,
+        moduleType: moduleType === 'patient-records' ? 'patient_records' : 'pharmacy_management',
+        fcmToken: fcmToken || localStorage.getItem('fcmToken')
+      });
 
-      // Simulate notification sent to mobile app
-      setTimeout(() => {
+      if (response.data.success) {
+        setMobileChallengeId(response.data.challengeId);
         setSuccess({
           message: '✅ Authentication request sent to your mobile app!',
           type: 'success'
         });
-        
-        // Simulate mobile app approval after 3 seconds
-        setTimeout(() => {
-          // This is where you would verify the challenge with your backend
-          const mockUserData = {
-            userId: 123,
-            firstName: 'John',
-            lastName: 'Doe',
-            email: 'john.doe@example.com',
-            dssn: dssn,
-            isVerified: true,
-            hasPatientRecord: moduleType === 'patient-records',
-            pharmacyId: moduleType === 'pharmacy-management' ? 456 : null,
-            pharmacyVerified: moduleType === 'pharmacy-management'
-          };
 
-          const mockToken = 'mock_jwt_token_for_mobile_auth_' + Date.now();
-          handleLoginSuccess(mockUserData, mockToken);
-          setShowMobileAuth(false);
+        // Start polling for status
+        const interval = setInterval(async () => {
+          try {
+            const statusResponse = await healthApi.get(`/mobile-auth/status/${response.data.challengeId}`);
+            
+            if (statusResponse.data.status === 'approved') {
+              clearInterval(interval);
+              setPolling(false);
+              handleLoginSuccess(statusResponse.data.user, statusResponse.data.token);
+              setShowMobileAuth(false);
+            } else if (statusResponse.data.status === 'denied') {
+              clearInterval(interval);
+              setPolling(false);
+              setError({
+                message: 'Healthcare access was denied on your mobile device',
+                type: 'error'
+              });
+              setShowMobileAuth(false);
+            } else if (statusResponse.data.status === 'expired') {
+              clearInterval(interval);
+              setPolling(false);
+              setError({
+                message: 'Authentication request expired. Please try again.',
+                type: 'error'
+              });
+              setShowMobileAuth(false);
+            }
+          } catch (error) {
+            console.error('Error polling mobile auth status:', error);
+          }
         }, 3000);
-      }, 1000);
+
+        setPollInterval(interval);
+        setPolling(true);
+
+        // Auto timeout after 5 minutes
+        setTimeout(() => {
+          if (polling) {
+            clearInterval(interval);
+            setPolling(false);
+            setShowMobileAuth(false);
+            setError({
+              message: 'Authentication request timed out. Please try again.',
+              type: 'error'
+            });
+          }
+        }, 5 * 60 * 1000);
+
+      } else {
+        // Check if professional registration is required
+        if (response.data.requiresProfessionalRegistration) {
+          setShowProfessionalModal(true);
+          setPendingLogin({ dssn, moduleType });
+        } else {
+          throw new Error(response.data.message || 'Failed to send authentication request');
+        }
+      }
 
     } catch (err) {
       setError({
-        message: 'Failed to send authentication request to mobile app.',
+        message: err.response?.data?.message || 'Failed to send authentication request to mobile app.',
         type: 'error'
       });
       setShowMobileAuth(false);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleProfessionalRegistrationSuccess = () => {
+    setShowProfessionalModal(false);
+    if (pendingLogin) {
+      // Retry mobile auth after registration
+      setTimeout(() => {
+        handleMobileAuth(pendingLogin.dssn, pendingLogin.moduleType);
+      }, 1000);
     }
   };
 
@@ -243,6 +338,10 @@ function App() {
               <h2 className="module-title">Patient Records System</h2>
               <p className="module-description">
                 Access and manage comprehensive patient health records and medical history
+                <br />
+                <small style={{ color: '#ef476f', fontWeight: 'bold' }}>
+                  🔒 Authorized Healthcare Professionals Only
+                </small>
               </p>
               
               {/* Messages Section */}
@@ -253,6 +352,15 @@ function App() {
                   </div>
                   <div className="message-content">
                     {error.message}
+                    {error.type === 'error' && verificationData?.requiresProfessionalVerification && (
+                      <button 
+                        className="btn btn-health btn-small"
+                        onClick={() => setShowProfessionalModal(true)}
+                        style={{ marginTop: '10px' }}
+                      >
+                        Register as Healthcare Professional
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -262,13 +370,32 @@ function App() {
                   <div className="message-icon">✅</div>
                   <div className="message-content">
                     {success.message}
-                    {verificationData?.hasRecord && (
+                    {verificationData && (
                       <div className="verification-details">
-                        <p>Welcome, {verificationData.user?.firstName} {verificationData.user?.lastName}</p>
-                        <p className="verification-email">{verificationData.user?.email}</p>
-                        <p className="verification-status">
-                          {verificationData.hasRecord ? '✓ Patient record found' : '✓ New record created'}
-                        </p>
+                        {verificationData.isHealthcareProfessional ? (
+                          <>
+                            <p>✅ Verified Healthcare Professional</p>
+                            <p className="verification-status">
+                              Type: {verificationData.professionalInfo?.type}
+                              {verificationData.professionalInfo?.specialization && 
+                                ` | ${verificationData.professionalInfo.specialization}`}
+                            </p>
+                            <p className="verification-email">
+                              License: {verificationData.professionalInfo?.licenseNumber}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="warning-text">
+                            ⚠️ Professional verification required to access patient records
+                            <button 
+                              className="btn btn-health btn-small"
+                              onClick={() => setShowProfessionalModal(true)}
+                              style={{ marginLeft: '10px' }}
+                            >
+                              Register Now
+                            </button>
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -279,22 +406,28 @@ function App() {
               {showMobileAuth && (
                 <div className="mobile-auth-section">
                   <div className="mobile-auth-icon">📱</div>
-                  <h3>Mobile Authentication Requested</h3>
-                  <p>Please check your Digital Liberia mobile app to approve this login attempt.</p>
+                  <h3>Healthcare Professional Verification</h3>
+                  <p>Please check your Digital Liberia mobile app to approve this healthcare access request.</p>
                   <div className="challenge-id">
-                    Challenge ID: <span className="challenge-code">{mobileChallengeId}</span>
+                    Healthcare Challenge ID: <span className="challenge-code">{mobileChallengeId}</span>
                   </div>
+                  {polling && (
+                    <div className="polling-status">
+                      <div className="spinner-small"></div>
+                      <span>Waiting for approval...</span>
+                    </div>
+                  )}
                   <div className="timeout-notice">
-                    This request will timeout in 60 seconds...
+                    This healthcare access request will timeout in 5 minutes...
                   </div>
                 </div>
               )}
               
               <div className="auth-tabs">
                 <div className="auth-section">
-                  <h3>Sign Up / Verify DSSN</h3>
+                  <h3>Verify DSSN & Professional Status</h3>
                   <p className="auth-description">
-                    Enter your 15-digit DSSN (Digital Social Security Number) to verify your identity
+                    Enter your 15-digit DSSN to verify your healthcare professional status
                   </p>
                   <div className="form-group">
                     <label htmlFor="dssn-signup">DSSN Number</label>
@@ -329,7 +462,7 @@ function App() {
                           Verifying...
                         </>
                       ) : (
-                        'Verify DSSN'
+                        'Verify Healthcare Professional Status'
                       )}
                     </button>
                   </div>
@@ -338,9 +471,9 @@ function App() {
                 <div className="divider">OR</div>
                 
                 <div className="auth-section">
-                  <h3>Login Options</h3>
+                  <h3>Healthcare Professional Login</h3>
                   <p className="auth-description">
-                    Choose your preferred login method
+                    Choose your preferred login method as healthcare professional
                   </p>
                   
                   <div className="login-options">
@@ -406,9 +539,16 @@ function App() {
                             });
                           }
                         }}
-                        disabled={loading || showMobileAuth}
+                        disabled={loading || showMobileAuth || polling}
                       >
-                        📱 Login with Mobile App
+                        {polling ? (
+                          <>
+                            <span className="spinner-small"></span>
+                            Waiting for Approval...
+                          </>
+                        ) : (
+                          '📱 Login with Mobile App'
+                        )}
                       </button>
                     </div>
                   </div>
@@ -417,8 +557,9 @@ function App() {
               
               <div className="module-footer">
                 <p className="footer-text">
-                  <strong>Note:</strong> Your DSSN is linked to your national identification.
-                  Mobile app authentication requires the Digital Liberia app installed on your phone.
+                  <strong>Note:</strong> Access to patient records is restricted to verified healthcare professionals only.
+                  You must be a registered doctor, nurse, or authorized medical staff.
+                  Mobile app authentication requires the Digital Liberia Healthcare app.
                 </p>
               </div>
             </div>
@@ -435,6 +576,10 @@ function App() {
               <h2 className="module-title">Pharmacy Management System</h2>
               <p className="module-description">
                 Real-time medication tracking and prescription management system
+                <br />
+                <small style={{ color: '#7209b7', fontWeight: 'bold' }}>
+                  🔒 Authorized Pharmacists Only
+                </small>
               </p>
               
               {/* Messages Section */}
@@ -445,6 +590,15 @@ function App() {
                   </div>
                   <div className="message-content">
                     {error.message}
+                    {error.type === 'error' && verificationData?.requiresPharmacistVerification && (
+                      <button 
+                        className="btn btn-medical btn-small"
+                        onClick={() => setShowProfessionalModal(true)}
+                        style={{ marginTop: '10px' }}
+                      >
+                        Register as Pharmacist
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -454,13 +608,30 @@ function App() {
                   <div className="message-icon">✅</div>
                   <div className="message-content">
                     {success.message}
-                    {verificationData?.hasPharmacy && (
+                    {verificationData && (
                       <div className="verification-details">
-                        <p>Welcome, {verificationData.user?.firstName} {verificationData.user?.lastName}</p>
-                        <p className="verification-email">{verificationData.user?.email}</p>
-                        <p className="verification-status">
-                          {verificationData.hasPharmacy ? '✓ Pharmacy profile found' : '✗ Pharmacy registration required'}
-                        </p>
+                        {verificationData.isAuthorizedPharmacist ? (
+                          <>
+                            <p>✅ Verified Pharmacist</p>
+                            <p className="verification-status">
+                              License: {verificationData.professionalInfo?.licenseNumber}
+                            </p>
+                            <p className="verification-email">
+                              Facility: {verificationData.professionalInfo?.facilityName}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="warning-text">
+                            ⚠️ Pharmacist verification required to access pharmacy management
+                            <button 
+                              className="btn btn-medical btn-small"
+                              onClick={() => setShowProfessionalModal(true)}
+                              style={{ marginLeft: '10px' }}
+                            >
+                              Register as Pharmacist
+                            </button>
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -470,23 +641,29 @@ function App() {
               {/* Mobile Authentication Section */}
               {showMobileAuth && (
                 <div className="mobile-auth-section">
-                  <div className="mobile-auth-icon">📱</div>
-                  <h3>Mobile Authentication Requested</h3>
-                  <p>Please check your Digital Liberia mobile app to approve this login attempt.</p>
+                  <div className="mobile-auth-icon">💊</div>
+                  <h3>Pharmacist Verification</h3>
+                  <p>Please check your Digital Liberia mobile app to approve this pharmacy access request.</p>
                   <div className="challenge-id">
-                    Challenge ID: <span className="challenge-code">{mobileChallengeId}</span>
+                    Pharmacy Challenge ID: <span className="challenge-code">{mobileChallengeId}</span>
                   </div>
+                  {polling && (
+                    <div className="polling-status">
+                      <div className="spinner-small"></div>
+                      <span>Waiting for approval...</span>
+                    </div>
+                  )}
                   <div className="timeout-notice">
-                    This request will timeout in 60 seconds...
+                    This pharmacy access request will timeout in 5 minutes...
                   </div>
                 </div>
               )}
               
               <div className="auth-tabs">
                 <div className="auth-section">
-                  <h3>Sign Up / Verify DSSN</h3>
+                  <h3>Verify DSSN & Pharmacist Status</h3>
                   <p className="auth-description">
-                    Enter your 15-digit DSSN to verify your pharmacy credentials
+                    Enter your 15-digit DSSN to verify your pharmacist credentials
                   </p>
                   <div className="form-group">
                     <label htmlFor="dssn-pharmacy-signup">DSSN Number</label>
@@ -521,7 +698,7 @@ function App() {
                           Verifying...
                         </>
                       ) : (
-                        'Verify DSSN'
+                        'Verify Pharmacist Status'
                       )}
                     </button>
                   </div>
@@ -530,9 +707,9 @@ function App() {
                 <div className="divider">OR</div>
                 
                 <div className="auth-section">
-                  <h3>Login Options</h3>
+                  <h3>Pharmacist Login</h3>
                   <p className="auth-description">
-                    Choose your preferred login method
+                    Choose your preferred login method as pharmacist
                   </p>
                   
                   <div className="login-options">
@@ -598,9 +775,16 @@ function App() {
                             });
                           }
                         }}
-                        disabled={loading || showMobileAuth}
+                        disabled={loading || showMobileAuth || polling}
                       >
-                        📱 Login with Mobile App
+                        {polling ? (
+                          <>
+                            <span className="spinner-small"></span>
+                            Waiting for Approval...
+                          </>
+                        ) : (
+                          '📱 Login with Mobile App'
+                        )}
                       </button>
                     </div>
                   </div>
@@ -609,7 +793,8 @@ function App() {
               
               <div className="module-footer">
                 <p className="footer-text">
-                  <strong>Note:</strong> Only registered pharmacies with valid licenses can access the management system.
+                  <strong>Note:</strong> Access to pharmacy management is restricted to verified pharmacists only.
+                  You must be a registered pharmacist with valid license.
                   Mobile app authentication requires the Digital Liberia Pharmacy app.
                 </p>
               </div>
@@ -630,15 +815,15 @@ function App() {
                   WebkitTextFillColor: 'transparent', 
                   backgroundClip: 'text' 
                 }}>
-                  Management System
+                  Professional System
                 </span>
               </h1>
               <p>
-                Revolutionizing healthcare delivery in Liberia with cutting-edge technology, 
-                secure patient records, and real-time medical services.
+                Secure healthcare management system for authorized medical professionals in Liberia.
+                Access patient records and pharmacy management with professional verification.
               </p>
 
-              {/* Enhanced Health Features Grid with Floating Animations */}
+              {/* Enhanced Health Features Grid with Professional Access */}
               <div className="health-features-grid">
                 {/* Patient Records Card */}
                 <div 
@@ -656,6 +841,10 @@ function App() {
                   <div className="health-feature-content">
                     <h4>Patient Records</h4>
                     <p>Secure digital health records with instant access for authorized medical professionals</p>
+                    <div className="access-badge">
+                      <span className="badge-icon">🔒</span>
+                      <span className="badge-text">Healthcare Professionals Only</span>
+                    </div>
                     <span className="card-click-hint">Click to access →</span>
                   </div>
                 </div>
@@ -676,14 +865,18 @@ function App() {
                   <div className="health-feature-content">
                     <h4>Pharmacy Management</h4>
                     <p>Real-time medication tracking and prescription management system</p>
+                    <div className="access-badge">
+                      <span className="badge-icon">🔒</span>
+                      <span className="badge-text">Pharmacists Only</span>
+                    </div>
                     <span className="card-click-hint">Click to access →</span>
                   </div>
                 </div>
 
-                {/* Telemedicine Card */}
+                {/* Professional Registration Card */}
                 <div 
-                  className="health-feature-item floating clickable-card telemedicine-card"
-                  onClick={() => handleCardClick('telemedicine')}
+                  className="health-feature-item floating clickable-card registration-card"
+                  onClick={() => setShowProfessionalModal(true)}
                   style={{
                     animationDelay: '0.4s',
                     cursor: 'pointer'
@@ -694,45 +887,59 @@ function App() {
                     boxShadow: '0 8px 25px rgba(239, 71, 111, 0.4)'
                   }}>🩺</div>
                   <div className="health-feature-content">
-                    <h4>Telemedicine</h4>
-                    <p>Virtual consultations and remote patient monitoring capabilities</p>
-                    <span className="card-click-hint">Coming Soon</span>
+                    <h4>Professional Registration</h4>
+                    <p>Register as healthcare professional to access medical systems</p>
+                    <div className="access-badge">
+                      <span className="badge-icon">📝</span>
+                      <span className="badge-text">Register Now</span>
+                    </div>
+                    <span className="card-click-hint">Click to register →</span>
                   </div>
                 </div>
 
-                {/* Emergency Response Card */}
+                {/* Mobile App Card */}
                 <div 
-                  className="health-feature-item floating clickable-card emergency-card"
-                  onClick={() => handleCardClick('emergency')}
+                  className="health-feature-item floating clickable-card mobile-card"
+                  onClick={() => window.open('https://digitalliberia.app', '_blank')}
                   style={{
                     animationDelay: '0.6s',
                     cursor: 'pointer'
                   }}
                 >
                   <div className="health-feature-icon" style={{
-                    background: 'linear-gradient(135deg, #ff4d4d, #ff7a00)',
-                    boxShadow: '0 8px 25px rgba(255, 77, 77, 0.4)'
-                  }}>🚑</div>
+                    background: 'linear-gradient(135deg, #2ebf91, #8360c3)',
+                    boxShadow: '0 8px 25px rgba(46, 191, 145, 0.4)'
+                  }}>📱</div>
                   <div className="health-feature-content">
-                    <h4>Emergency Response</h4>
-                    <p>Rapid emergency services coordination and ambulance dispatch</p>
-                    <span className="card-click-hint">Coming Soon</span>
+                    <h4>Mobile App</h4>
+                    <p>Download Digital Liberia app for mobile authentication</p>
+                    <div className="access-badge">
+                      <span className="badge-icon">⬇️</span>
+                      <span className="badge-text">Download App</span>
+                    </div>
+                    <span className="card-click-hint">Get the app →</span>
                   </div>
                 </div>
               </div>
 
               <div className="hero-actions">
                 <button 
-                  onClick={() => setShowLogin(true)}
+                  onClick={() => setShowProfessionalModal(true)}
                   className="btn btn-health"
                 >
-                  🏥 Access Health Portal
+                  🩺 Register as Professional
                 </button>
-                <button className="btn btn-emergency">
-                  🚑 Emergency Services
+                <button 
+                  onClick={() => handleCardClick('patient-records')}
+                  className="btn btn-emergency"
+                >
+                  📊 Access Patient Records
                 </button>
-                <button className="btn btn-medical">
-                  💊 Pharmacy Services
+                <button 
+                  onClick={() => handleCardClick('pharmacy-management')}
+                  className="btn btn-medical"
+                >
+                  💊 Pharmacy Management
                 </button>
               </div>
             </div>
@@ -752,7 +959,6 @@ function App() {
                   overflow: 'hidden'
                 }}
               >
-                {/* Subtle background pattern */}
                 <div style={{
                   position: 'absolute',
                   top: 0,
@@ -760,36 +966,35 @@ function App() {
                   right: 0,
                   bottom: 0,
                   background: `linear-gradient(45deg, 
-                    rgba(239, 71, 111, 0.08) 0%, 
-                    rgba(255, 77, 77, 0.08) 50%, 
-                    rgba(255, 122, 0, 0.08) 100%)`,
+                    rgba(0, 212, 170, 0.08) 0%, 
+                    rgba(114, 9, 183, 0.08) 50%, 
+                    rgba(239, 71, 111, 0.08) 100%)`,
                   zIndex: 0
                 }}></div>
                 
-                {/* Red Love Sign */}
                 <div 
                   style={{
                     fontSize: '6rem',
                     marginBottom: '2rem',
-                    color: '#ef476f',
-                    filter: 'drop-shadow(0 4px 12px rgba(239, 71, 111, 0.4))',
+                    color: '#00d4aa',
+                    filter: 'drop-shadow(0 4px 12px rgba(0, 212, 170, 0.4))',
                     position: 'relative',
                     zIndex: 1,
                     animation: 'pulse 2s ease-in-out infinite'
                   }}
                 >
-                  ❤️
+                  🏥
                 </div>
                 <h3 style={{ 
-                  color: '#ef476f', 
+                  color: '#00d4aa', 
                   marginBottom: '1rem',
                   fontSize: '1.5rem',
                   fontWeight: '700',
                   position: 'relative',
                   zIndex: 1,
-                  textShadow: '0 2px 4px rgba(239, 71, 111, 0.2)'
+                  textShadow: '0 2px 4px rgba(0, 212, 170, 0.2)'
                 }}>
-                  Your Health, Our Priority
+                  Authorized Healthcare Access
                 </h3>
                 <p style={{ 
                   color: 'var(--text-light)', 
@@ -797,16 +1002,15 @@ function App() {
                   position: 'relative',
                   zIndex: 1
                 }}>
-                  Secure, efficient, and modern healthcare solutions for all Liberians
+                  Secure professional access for doctors, nurses, pharmacists, and medical staff
                 </p>
                 
-                {/* Liberia Flag Badge */}
                 <div style={{
                   position: 'absolute',
                   top: '1rem',
                   right: '1rem',
-                  background: 'rgba(239, 71, 111, 0.1)',
-                  border: '1px solid rgba(239, 71, 111, 0.3)',
+                  background: 'rgba(0, 212, 170, 0.1)',
+                  border: '1px solid rgba(0, 212, 170, 0.3)',
                   borderRadius: '8px',
                   padding: '0.5rem 0.8rem',
                   display: 'flex',
@@ -817,10 +1021,10 @@ function App() {
                   <span style={{ fontSize: '1.2rem' }}>🇱🇷</span>
                   <span style={{ 
                     fontSize: '0.8rem', 
-                    color: '#ef476f',
+                    color: '#00d4aa',
                     fontWeight: '600'
                   }}>
-                    LIBERIA
+                    HEALTHCARE ACCESS
                   </span>
                 </div>
               </div>
@@ -840,15 +1044,16 @@ function App() {
         try {
           setDashboardLoading(true);
           
-          // Based on user type, fetch relevant data
-          if (user.hasPatientRecord) {
-            // Fetch patient dashboard data
-            const response = await healthApi.get('/patient/record');
-            setDashboardData(response.data.data);
-          } else if (user.pharmacyId) {
-            // Fetch pharmacy dashboard data
-            const response = await healthApi.get('/pharmacy/profile');
-            setDashboardData(response.data.data);
+          if (user.isHealthcareProfessional) {
+            if (user.hasPatientRecordAccess) {
+              // Fetch patient dashboard data
+              const response = await healthApi.get('/patient/dashboard');
+              setDashboardData(response.data.data);
+            } else if (user.hasPharmacyAccess) {
+              // Fetch pharmacy dashboard data
+              const response = await healthApi.get('/pharmacy/dashboard');
+              setDashboardData(response.data.data);
+            }
           }
         } catch (error) {
           console.error('Error fetching dashboard data:', error);
@@ -864,7 +1069,7 @@ function App() {
       return (
         <div className="loading-container">
           <div className="spinner-large"></div>
-          <p>Loading your dashboard...</p>
+          <p>Loading your professional dashboard...</p>
         </div>
       );
     }
@@ -883,7 +1088,6 @@ function App() {
           overflow: 'hidden'
         }}
       >
-        {/* Background pattern */}
         <div style={{
           position: 'absolute',
           top: 0,
@@ -909,7 +1113,7 @@ function App() {
             zIndex: 1
           }}
         >
-          🎉
+          {user.hasPatientRecordAccess ? '👨‍⚕️' : '💊'}
         </div>
         <h1 style={{ 
           color: 'var(--text-dark)', 
@@ -919,7 +1123,7 @@ function App() {
           position: 'relative',
           zIndex: 1
         }}>
-          Welcome to Health Portal
+          Welcome to Healthcare Portal
         </h1>
         <p style={{ 
           color: 'var(--text-light)', 
@@ -928,16 +1132,22 @@ function App() {
           position: 'relative',
           zIndex: 1
         }}>
-          Access advanced healthcare tools and patient management systems
+          {user.hasPatientRecordAccess 
+            ? 'Access patient records and medical management tools' 
+            : 'Manage pharmacy inventory and prescriptions'}
         </p>
         
-        {/* User Info Badge */}
+        {/* Professional Info Badge */}
         <div style={{
           display: 'inline-flex',
           alignItems: 'center',
           gap: '0.8rem',
-          background: user.hasPatientRecord ? 'rgba(0, 212, 170, 0.1)' : 'rgba(114, 9, 183, 0.1)',
-          border: user.hasPatientRecord ? '1px solid rgba(0, 212, 170, 0.3)' : '1px solid rgba(114, 9, 183, 0.3)',
+          background: user.hasPatientRecordAccess 
+            ? 'rgba(0, 212, 170, 0.1)' 
+            : 'rgba(114, 9, 183, 0.1)',
+          border: user.hasPatientRecordAccess 
+            ? '1px solid rgba(0, 212, 170, 0.3)' 
+            : '1px solid rgba(114, 9, 183, 0.3)',
           borderRadius: '12px',
           padding: '0.8rem 1.2rem',
           marginBottom: '2rem',
@@ -945,29 +1155,32 @@ function App() {
           zIndex: 1
         }}>
           <span style={{ fontSize: '1.5rem' }}>
-            {user.hasPatientRecord ? '👤' : '💊'}
+            {user.hasPatientRecordAccess ? '👨‍⚕️' : '💊'}
           </span>
           <div>
             <div style={{ 
               fontSize: '0.9rem', 
-              color: user.hasPatientRecord ? 'var(--success-color)' : 'var(--medical-color)',
+              color: user.hasPatientRecordAccess 
+                ? 'var(--success-color)' 
+                : 'var(--medical-color)',
               fontWeight: '600'
             }}>
-              {user.hasPatientRecord ? 'Patient Portal' : 'Pharmacy Portal'}
+              {user.professionalType ? user.professionalType.charAt(0).toUpperCase() + user.professionalType.slice(1) : 'Professional'}
+              {user.specialization && ` - ${user.specialization}`}
             </div>
             <div style={{ 
               fontSize: '0.8rem', 
               color: 'var(--text-light)',
               marginTop: '0.2rem'
             }}>
-              DSSN: {user.dssn}
+              DSSN: {user.dssn} | Access Level: {user.accessLevel}
             </div>
           </div>
         </div>
         
-        {/* Enhanced Health Action Grid for Logged-in Users */}
+        {/* Professional Action Grid */}
         <div className="health-action-grid">
-          {user.hasPatientRecord && (
+          {user.hasPatientRecordAccess && (
             <>
               <div className="health-action-card floating" style={{
                 background: 'linear-gradient(135deg, rgba(0, 212, 170, 0.15), rgba(17, 138, 178, 0.1))',
@@ -979,12 +1192,12 @@ function App() {
                   background: 'linear-gradient(135deg, #00d4aa, #118ab2)',
                   boxShadow: '0 15px 30px rgba(0, 212, 170, 0.4)'
                 }}>📋</div>
-                <h3 className="health-card-title">View Medical Records</h3>
+                <h3 className="health-card-title">View Patient Records</h3>
                 <p className="health-card-description">
-                  Access your complete medical history, lab results, and prescriptions
+                  Access and review patient medical histories and records
                 </p>
-                <button className="btn btn-health" onClick={() => alert('Patient records view will open')}>
-                  View Records
+                <button className="btn btn-health">
+                  Access Records
                 </button>
               </div>
               
@@ -998,18 +1211,18 @@ function App() {
                   background: 'linear-gradient(135deg, #ef476f, #ffd166)',
                   boxShadow: '0 15px 30px rgba(239, 71, 111, 0.4)'
                 }}>🩺</div>
-                <h3 className="health-card-title">Book Appointment</h3>
+                <h3 className="health-card-title">Update Medical Records</h3>
                 <p className="health-card-description">
-                  Schedule appointments with doctors and healthcare providers
+                  Add notes, diagnoses, and update patient information
                 </p>
                 <button className="btn btn-emergency">
-                  Book Now
+                  Update Records
                 </button>
               </div>
             </>
           )}
           
-          {user.pharmacyId && (
+          {user.hasPharmacyAccess && (
             <>
               <div className="health-action-card floating" style={{
                 background: 'linear-gradient(135deg, rgba(114, 9, 183, 0.15), rgba(58, 134, 255, 0.1))',
@@ -1023,9 +1236,9 @@ function App() {
                 }}>💊</div>
                 <h3 className="health-card-title">Manage Inventory</h3>
                 <p className="health-card-description">
-                  Track medication stock, manage prescriptions, and update inventory
+                  Track medication stock and update pharmacy inventory
                 </p>
-                <button className="btn btn-medical" onClick={() => alert('Pharmacy management will open')}>
+                <button className="btn btn-medical">
                   Manage Pharmacy
                 </button>
               </div>
@@ -1042,7 +1255,7 @@ function App() {
                 }}>📋</div>
                 <h3 className="health-card-title">Process Prescriptions</h3>
                 <p className="health-card-description">
-                  Fill prescriptions, manage refills, and track patient medications
+                  Fill and manage patient medication prescriptions
                 </p>
                 <button className="btn btn-health">
                   View Prescriptions
@@ -1050,28 +1263,9 @@ function App() {
               </div>
             </>
           )}
-          
-          <div className="health-action-card floating" style={{
-            background: 'linear-gradient(135deg, rgba(17, 138, 178, 0.15), rgba(46, 191, 145, 0.1))',
-            border: '1px solid rgba(17, 138, 178, 0.3)',
-            backdropFilter: 'blur(20px)',
-            animationDelay: '0.4s'
-          }}>
-            <div className="health-card-icon" style={{
-              background: 'linear-gradient(135deg, #118ab2, #2ebf91)',
-              boxShadow: '0 15px 30px rgba(17, 138, 178, 0.4)'
-            }}>📊</div>
-            <h3 className="health-card-title">Health Analytics</h3>
-            <p className="health-card-description">
-              Advanced analytics and reporting for healthcare insights and trends
-            </p>
-            <button className="btn btn-health">
-              View Analytics
-            </button>
-          </div>
         </div>
         
-        {/* User Information Section */}
+        {/* Professional Information Section */}
         <div style={{ 
           marginTop: '3rem',
           padding: '2rem',
@@ -1084,7 +1278,7 @@ function App() {
             marginBottom: '1rem',
             fontSize: '1.5rem'
           }}>
-            Account Information
+            Professional Information
           </h3>
           <div style={{ 
             display: 'grid',
@@ -1096,13 +1290,19 @@ function App() {
               <strong>Name:</strong> {user.firstName} {user.lastName}
             </div>
             <div>
-              <strong>Email:</strong> {user.email}
+              <strong>Professional Type:</strong> {user.professionalType}
+            </div>
+            <div>
+              <strong>Specialization:</strong> {user.specialization || 'N/A'}
             </div>
             <div>
               <strong>DSSN:</strong> {user.dssn}
             </div>
             <div>
-              <strong>Account Type:</strong> {user.hasPatientRecord ? 'Patient' : user.pharmacyId ? 'Pharmacy' : 'User'}
+              <strong>Facility:</strong> {user.facilityName || 'N/A'}
+            </div>
+            <div>
+              <strong>Access Level:</strong> {user.accessLevel}
             </div>
           </div>
         </div>
@@ -1124,10 +1324,9 @@ function App() {
         <div className="header-content">
           <div className="logo">
             <span className="logo-icon">🏥</span>
-            <span>Digital Liberia Health</span>
+            <span>Digital Liberia Health Professional</span>
           </div>
           
-          {/* Liberia Flag and Login Section */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
             {/* Liberia Flag */}
             <div 
@@ -1171,7 +1370,8 @@ function App() {
                     fontWeight: '600',
                     fontSize: '0.85rem'
                   }}>
-                    👤 {user.firstName} {user.lastName}
+                    {user.hasPatientRecordAccess ? '👨‍⚕️' : '💊'} 
+                    {user.firstName} {user.lastName}
                   </span>
                 </div>
                 <button 
@@ -1189,7 +1389,7 @@ function App() {
             ) : (
               !activeModule && (
                 <button 
-                  onClick={() => setShowLogin(true)}
+                  onClick={() => handleCardClick('patient-records')}
                   className="btn btn-health"
                   style={{ 
                     padding: '0.7rem 1.5rem', 
@@ -1197,7 +1397,7 @@ function App() {
                     boxShadow: '0 4px 15px rgba(0, 212, 170, 0.4)'
                   }}
                 >
-                  🏥 Healthcare Login
+                  🏥 Healthcare Professional Login
                 </button>
               )
             )}
@@ -1219,6 +1419,16 @@ function App() {
           </div>
         )}
       </main>
+
+      {/* Professional Verification Modal */}
+      {showProfessionalModal && (
+        <ProfessionalVerificationModal
+          isOpen={showProfessionalModal}
+          onClose={() => setShowProfessionalModal(false)}
+          onSuccess={handleProfessionalRegistrationSuccess}
+          userDssn={verificationData?.user?.dssn || pendingLogin?.dssn}
+        />
+      )}
     </div>
   );
 }
