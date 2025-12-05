@@ -4,7 +4,7 @@ import ProfessionalVerificationModal from './ProfessionalVerificationModal'; // 
 
 // Configure axios for health system API
 const healthApi = axios.create({
-  baseURL: process.env.REACT_APP_HEALTH_API_URL || 'http://localhost:8081/api/health',
+  baseURL: process.env.REACT_APP_HEALTH_API_URL || 'https://libpayapp.liberianpost.com:8081/api/health',
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json'
