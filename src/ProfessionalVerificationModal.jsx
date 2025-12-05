@@ -16,32 +16,91 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
 
+    // Frontend validation before sending
+    const validateForm = () => {
+        if (!userDssn || userDssn.length < 15 || userDssn.length > 20 || !/^[A-Za-z0-9]+$/.test(userDssn)) {
+            return { valid: false, message: 'Invalid DSSN format. Must be 15-20 alphanumeric characters.' };
+        }
+
+        if (!formData.professionalType) {
+            return { valid: false, message: 'Please select a professional type.' };
+        }
+
+        if (!formData.licenseNumber || formData.licenseNumber.trim() === '') {
+            return { valid: false, message: 'License number is required.' };
+        }
+
+        if (!formData.licenseExpiry) {
+            return { valid: false, message: 'License expiry date is required.' };
+        }
+
+        // Check if license is expired
+        const expiryDate = new Date(formData.licenseExpiry);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Reset time part for comparison
+        
+        if (expiryDate < today) {
+            return { valid: false, message: 'License cannot be expired. Please enter a future date.' };
+        }
+
+        if (!formData.facilityName || formData.facilityName.trim() === '') {
+            return { valid: false, message: 'Facility name is required.' };
+        }
+
+        return { valid: true };
+    };
+
     const handleSubmit = async () => {
         setLoading(true);
         setError(null);
         
+        // Frontend validation
+        const validation = validateForm();
+        if (!validation.valid) {
+            setError(validation.message);
+            setLoading(false);
+            return;
+        }
+
         try {
-            // NO LONGER NEED TOKEN - Endpoint is public
+            // Format the date properly
+            const formattedExpiry = new Date(formData.licenseExpiry).toISOString().split('T')[0];
+            
+            // Prepare the request data
+            const requestData = { 
+                ...formData, 
+                dssn: userDssn,
+                licenseExpiry: formattedExpiry
+            };
+
+            console.log('Sending registration data:', requestData);
+            console.log('API URL:', `${process.env.REACT_APP_HEALTH_API_URL || 'https://libpayapp.liberianpost.com:8081/api/health'}/register-professional`);
+
+            // Send the request WITHOUT authorization headers
             const response = await axios.post(
                 `${process.env.REACT_APP_HEALTH_API_URL || 'https://libpayapp.liberianpost.com:8081/api/health'}/register-professional`,
-                { 
-                    ...formData, 
-                    dssn: userDssn,
-                    licenseExpiry: new Date(formData.licenseExpiry).toISOString().split('T')[0]
-                }
-                // REMOVED: Authorization headers since endpoint is public
+                requestData
+                // No headers needed - endpoint is public
             );
 
+            console.log('Registration response:', response.data);
+            
             if (response.data.success) {
                 setSuccess('Professional registration submitted for verification');
                 setStep(3);
                 if (onSuccess) onSuccess();
             }
         } catch (err) {
-            // Enhanced error handling
-            console.error('Registration error:', err.response?.data || err.message);
+            console.error('Registration error:', err);
+            console.error('Error response data:', err.response?.data);
+            console.error('Error status:', err.response?.status);
             
-            if (err.response?.data?.nextStep === 'register_in_main_app') {
+            // Enhanced error handling
+            if (err.response?.data?.errors) {
+                // Show validation errors from backend
+                const validationErrors = err.response.data.errors.map(err => err.msg).join(', ');
+                setError(`Validation errors: ${validationErrors}`);
+            } else if (err.response?.data?.nextStep === 'register_in_main_app') {
                 setError(
                     <div>
                         <strong>No user found with this DSSN.</strong>
@@ -66,8 +125,12 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                         Please login using your DSSN and password.
                     </div>
                 );
+            } else if (err.response?.data?.message) {
+                setError(err.response.data.message);
+            } else if (err.message) {
+                setError(err.message);
             } else {
-                setError(err.response?.data?.message || 'Registration failed. Please try again.');
+                setError('Registration failed. Please try again.');
             }
         } finally {
             setLoading(false);
@@ -91,7 +154,7 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                             Please provide your professional details for verification
                             <br />
                             <small style={{ color: '#ef476f', marginTop: '5px', display: 'block' }}>
-                                <strong>Note:</strong> You must already have a Digital Liberia account with this DSSN.
+                                <strong>Note:</strong> You must already have a Digital Liberia account with DSSN: {userDssn}
                             </small>
                         </p>
                         
@@ -101,6 +164,7 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                                 value={formData.professionalType}
                                 onChange={(e) => setFormData({...formData, professionalType: e.target.value})}
                                 className="form-select"
+                                required
                             >
                                 <option value="">Select professional type</option>
                                 <option value="doctor">Medical Doctor</option>
@@ -113,7 +177,7 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                         </div>
                         
                         <div className="form-group">
-                            <label>Specialization</label>
+                            <label>Specialization (Optional)</label>
                             <input 
                                 type="text"
                                 placeholder="e.g., Cardiology, Pediatrics, General Practice, etc."
@@ -132,7 +196,9 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                                 onChange={(e) => setFormData({...formData, licenseNumber: e.target.value})}
                                 className="form-input"
                                 required
+                                minLength="3"
                             />
+                            <p className="input-help">e.g., MED123456, LIC789012</p>
                         </div>
                         
                         <div className="form-group">
@@ -173,6 +239,7 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                                 value={formData.facilityType}
                                 onChange={(e) => setFormData({...formData, facilityType: e.target.value})}
                                 className="form-select"
+                                required
                             >
                                 <option value="hospital">Hospital</option>
                                 <option value="clinic">Clinic</option>
@@ -192,11 +259,12 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                                 onChange={(e) => setFormData({...formData, facilityName: e.target.value})}
                                 className="form-input"
                                 required
+                                minLength="3"
                             />
                         </div>
                         
                         <div className="form-group">
-                            <label>Department/Section</label>
+                            <label>Department/Section (Optional)</label>
                             <input 
                                 type="text"
                                 placeholder="e.g., Emergency, Pediatrics, Pharmacy, etc."
@@ -211,6 +279,7 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                                 <button 
                                     className="btn btn-secondary"
                                     onClick={() => setStep(1)}
+                                    disabled={loading}
                                 >
                                     ← Back
                                 </button>
@@ -271,6 +340,13 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                         <div className="error-icon">⚠️</div>
                         <div className="error-content">
                             {error}
+                            <button 
+                                className="btn btn-small"
+                                onClick={() => setError(null)}
+                                style={{ marginLeft: '10px', fontSize: '0.8rem', padding: '5px 10px' }}
+                            >
+                                Dismiss
+                            </button>
                         </div>
                     </div>
                 )}
