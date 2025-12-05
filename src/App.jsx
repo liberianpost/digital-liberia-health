@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import ProfessionalVerificationModal from './ProfessionalVerificationModal'; // You'll create this component
+import ProfessionalVerificationModal from './ProfessionalVerificationModal';
 
 // Configure axios for health system API
 const healthApi = axios.create({
@@ -50,7 +50,6 @@ const firebaseConfig = {
 
 function App() {
   const [user, setUser] = useState(null);
-  const [showLogin, setShowLogin] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeModule, setActiveModule] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -64,6 +63,7 @@ function App() {
   const [showProfessionalModal, setShowProfessionalModal] = useState(false);
   const [pendingLogin, setPendingLogin] = useState(null);
   const [fcmToken, setFcmToken] = useState(null);
+  const [firebaseInitialized, setFirebaseInitialized] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -82,7 +82,7 @@ function App() {
       }
     }
 
-    // Initialize Firebase
+    // Initialize Firebase (without requesting notification permission)
     initializeFirebase();
 
     window.addEventListener('scroll', handleScroll);
@@ -98,20 +98,18 @@ function App() {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       try {
         const { initializeApp } = await import('firebase/app');
-        const { getMessaging, getToken } = await import('firebase/messaging');
+        const { getMessaging } = await import('firebase/messaging');
         
         const app = initializeApp(firebaseConfig);
         const messaging = getMessaging(app);
         
-        // Request notification permission
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-          const vapidKey = "BEICu1bx8LKW5j7cag5tU9B2qfcejWi7QPm8a95jFODSIUNRiellygLGroK9NyWt-3WsTiUZscmS311gGXiXV7Q";
-          const currentToken = await getToken(messaging, { vapidKey });
-          if (currentToken) {
-            setFcmToken(currentToken);
-            localStorage.setItem('fcmToken', currentToken);
-          }
+        console.log('Firebase initialized successfully');
+        setFirebaseInitialized(true);
+        
+        // Check if we already have an FCM token
+        const existingToken = localStorage.getItem('fcmToken');
+        if (existingToken) {
+          setFcmToken(existingToken);
         }
       } catch (error) {
         console.log('Firebase initialization error:', error);
@@ -119,9 +117,38 @@ function App() {
     }
   };
 
+  // Function to request notification permission (called by user action)
+  const requestNotificationPermission = async () => {
+    try {
+      if (!firebaseInitialized) {
+        await initializeFirebase();
+      }
+      
+      const { getMessaging, getToken } = await import('firebase/messaging');
+      const messaging = getMessaging();
+      
+      // Request notification permission (this is the user gesture)
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        const vapidKey = "BEICu1bx8LKW5j7cag5tU9B2qfcejWi7QPm8a95jFODSIUNRiellygLGroK9NyWt-3WsTiUZscmS311gGXiXV7Q";
+        const currentToken = await getToken(messaging, { vapidKey });
+        if (currentToken) {
+          setFcmToken(currentToken);
+          localStorage.setItem('fcmToken', currentToken);
+          console.log('FCM Token obtained:', currentToken);
+          setSuccess({ message: '✅ Notifications enabled successfully!' });
+        }
+      } else if (permission === 'denied') {
+        setError({ message: '❌ Notification permission denied. Please enable in browser settings.', type: 'error' });
+      }
+    } catch (error) {
+      console.log('Notification permission error:', error);
+      setError({ message: 'Failed to enable notifications. Please try again.', type: 'error' });
+    }
+  };
+
   const handleLoginSuccess = (userData, token) => {
     setUser(userData);
-    setShowLogin(false);
     setActiveModule(null);
     localStorage.setItem('health_token', token);
     localStorage.setItem('health_user', JSON.stringify(userData));
@@ -233,11 +260,23 @@ function App() {
     setShowMobileAuth(true);
 
     try {
+      // Check if user has FCM token
+      const userFcmToken = fcmToken || localStorage.getItem('fcmToken');
+      if (!userFcmToken) {
+        setError({
+          message: 'Please enable notifications first to use mobile authentication.',
+          type: 'error'
+        });
+        setShowMobileAuth(false);
+        setLoading(false);
+        return;
+      }
+
       // Request mobile authentication
       const response = await healthApi.post('/mobile-auth/request', {
         dssn,
         moduleType: moduleType === 'patient-records' ? 'patient_records' : 'pharmacy_management',
-        fcmToken: fcmToken || localStorage.getItem('fcmToken')
+        fcmToken: userFcmToken
       });
 
       if (response.data.success) {
@@ -940,6 +979,12 @@ function App() {
                   className="btn btn-medical"
                 >
                   💊 Pharmacy Management
+                </button>
+                <button 
+                  onClick={requestNotificationPermission}
+                  className="btn btn-mobile"
+                >
+                  🔔 Enable Notifications
                 </button>
               </div>
             </div>
