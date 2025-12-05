@@ -21,22 +21,15 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
         setError(null);
         
         try {
-            // Get token from localStorage
-            const token = localStorage.getItem('health_token');
-            
+            // NO LONGER NEED TOKEN - Endpoint is public
             const response = await axios.post(
                 `${process.env.REACT_APP_HEALTH_API_URL || 'https://libpayapp.liberianpost.com:8081/api/health'}/register-professional`,
                 { 
                     ...formData, 
                     dssn: userDssn,
                     licenseExpiry: new Date(formData.licenseExpiry).toISOString().split('T')[0]
-                },
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': token ? `Bearer ${token}` : ''
-                    }
                 }
+                // REMOVED: Authorization headers since endpoint is public
             );
 
             if (response.data.success) {
@@ -45,7 +38,37 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                 if (onSuccess) onSuccess();
             }
         } catch (err) {
-            setError(err.response?.data?.message || 'Registration failed. Please try again.');
+            // Enhanced error handling
+            console.error('Registration error:', err.response?.data || err.message);
+            
+            if (err.response?.data?.nextStep === 'register_in_main_app') {
+                setError(
+                    <div>
+                        <strong>No user found with this DSSN.</strong>
+                        <br />
+                        Please register through the Digital Liberia mobile app first.
+                        <br />
+                        <a 
+                            href="https://digitalliberia.app" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            style={{ color: '#00d4aa', textDecoration: 'underline', marginTop: '10px', display: 'inline-block' }}
+                        >
+                            Download Digital Liberia App →
+                        </a>
+                    </div>
+                );
+            } else if (err.response?.data?.action === 'login') {
+                setError(
+                    <div>
+                        <strong>Professional profile already approved!</strong>
+                        <br />
+                        Please login using your DSSN and password.
+                    </div>
+                );
+            } else {
+                setError(err.response?.data?.message || 'Registration failed. Please try again.');
+            }
         } finally {
             setLoading(false);
         }
@@ -66,6 +89,10 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                         <h3>Step 1: Professional Information</h3>
                         <p className="step-description">
                             Please provide your professional details for verification
+                            <br />
+                            <small style={{ color: '#ef476f', marginTop: '5px', display: 'block' }}>
+                                <strong>Note:</strong> You must already have a Digital Liberia account with this DSSN.
+                            </small>
                         </p>
                         
                         <div className="form-group">
@@ -116,7 +143,9 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                                 onChange={(e) => setFormData({...formData, licenseExpiry: e.target.value})}
                                 className="form-input"
                                 required
+                                min={new Date().toISOString().split('T')[0]} // Today's date
                             />
+                            <p className="input-help">License must not be expired</p>
                         </div>
                         
                         <div className="form-actions">
@@ -219,9 +248,13 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                             <li>🔓 Access granted to healthcare systems</li>
                         </ul>
                         <p>
-                            You will receive an email notification once your verification is complete.
-                            You can then access the healthcare systems using your DSSN.
+                            <strong>After Approval:</strong>
                         </p>
+                        <ul className="verification-steps">
+                            <li>✅ Login with DSSN + Password (from Digital Liberia app)</li>
+                            <li>📱 OR approve via mobile notification</li>
+                            <li>🏥 Access healthcare systems</li>
+                        </ul>
                         <div className="button-group">
                             <button 
                                 className="btn btn-health"
