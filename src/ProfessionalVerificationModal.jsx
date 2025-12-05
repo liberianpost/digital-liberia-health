@@ -25,7 +25,7 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
             const token = localStorage.getItem('health_token');
             
             const response = await axios.post(
-                `${process.env.REACT_APP_HEALTH_API_URL || 'http://localhost:8081/api/health'}/register-professional`,
+                `${process.env.REACT_APP_HEALTH_API_URL || 'https://libpayapp.liberianpost.com:8081/api/health'}/register-professional`,
                 { 
                     ...formData, 
                     dssn: userDssn,
