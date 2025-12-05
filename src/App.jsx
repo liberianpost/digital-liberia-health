@@ -15,6 +15,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [showLogin, setShowLogin] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [activeModule, setActiveModule] = useState(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -36,88 +37,204 @@ function App() {
     localStorage.removeItem('healthUser');
   };
 
-  return (
-    <div className="app">
-      {/* Header */}
-      <header className={`header ${scrolled ? 'scrolled' : ''}`}>
-        <div className="header-content">
-          <div className="logo">
-            <span className="logo-icon">🏥</span>
-            <span>Digital Liberia Health</span>
-          </div>
-          
-          {/* Liberia Flag and Login Section */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-            {/* Liberia Flag */}
-            <div 
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                background: 'rgba(255, 255, 255, 0.1)',
-                padding: '0.5rem 1rem',
-                borderRadius: '12px',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                backdropFilter: 'blur(10px)'
-              }}
-            >
-              <div style={{ 
-                fontSize: '1.5rem',
-                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))'
-              }}>
-                🇱🇷
+  const handleCardClick = (module) => {
+    setActiveModule(module);
+  };
+
+  const handleBackToHome = () => {
+    setActiveModule(null);
+  };
+
+  const handleDSSNVerify = (dssn) => {
+    // Backend verification will be implemented later
+    console.log('Verifying DSSN:', dssn);
+    alert(`DSSN ${dssn} verification logic will be implemented in backend`);
+  };
+
+  const handleLogin = (credentials) => {
+    // Backend login will be implemented later
+    console.log('Login attempt with:', credentials);
+    alert('Login functionality will be implemented in backend');
+  };
+
+  const renderModuleContent = () => {
+    switch(activeModule) {
+      case 'patient-records':
+        return (
+          <div className="module-container">
+            <button className="back-button" onClick={handleBackToHome}>
+              ← Back to Home
+            </button>
+            <div className="module-content">
+              <h2 className="module-title">Patient Records System</h2>
+              <p className="module-description">
+                Access and manage comprehensive patient health records and medical history
+              </p>
+              
+              <div className="auth-tabs">
+                <div className="auth-section">
+                  <h3>Sign Up</h3>
+                  <p className="auth-description">
+                    Enter your DSSN (Digital Social Security Number) to verify your identity
+                  </p>
+                  <div className="form-group">
+                    <label htmlFor="dssn-signup">DSSN Number</label>
+                    <input
+                      type="text"
+                      id="dssn-signup"
+                      placeholder="Enter 15-digit alphanumeric DSSN"
+                      maxLength={15}
+                      pattern="[A-Za-z0-9]{15}"
+                    />
+                    <p className="input-help">15 characters, letters and numbers only</p>
+                    <button 
+                      className="btn btn-health verify-btn"
+                      onClick={() => {
+                        const dssn = document.getElementById('dssn-signup').value;
+                        if(dssn.length === 15 && /^[A-Za-z0-9]+$/.test(dssn)) {
+                          handleDSSNVerify(dssn);
+                        } else {
+                          alert('Please enter a valid 15-digit alphanumeric DSSN');
+                        }
+                      }}
+                    >
+                      Verify DSSN
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="divider">OR</div>
+                
+                <div className="auth-section">
+                  <h3>Login</h3>
+                  <p className="auth-description">
+                    Access your account with DSSN and password
+                  </p>
+                  <div className="form-group">
+                    <label htmlFor="dssn-login">DSSN Number</label>
+                    <input
+                      type="text"
+                      id="dssn-login"
+                      placeholder="Enter your DSSN"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="password">Password</label>
+                    <input
+                      type="password"
+                      id="password"
+                      placeholder="Enter your password"
+                    />
+                  </div>
+                  <button 
+                    className="btn btn-health login-btn"
+                    onClick={() => {
+                      const dssn = document.getElementById('dssn-login').value;
+                      const password = document.getElementById('password').value;
+                      if(dssn && password) {
+                        handleLogin({ dssn, password });
+                      } else {
+                        alert('Please enter both DSSN and password');
+                      }
+                    }}
+                  >
+                    Login to Patient Records
+                  </button>
+                </div>
               </div>
-              <span style={{ 
-                color: 'var(--white)', 
-                fontSize: '0.9rem',
-                fontWeight: '600',
-                textShadow: '0 1px 2px rgba(0,0,0,0.3)'
-              }}>
-                Republic of Liberia
-              </span>
             </div>
-
-            {user ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                <span style={{ 
-                  color: 'var(--white)', 
-                  fontWeight: '600',
-                  fontSize: '0.95rem'
-                }}>
-                  Welcome, Dr. {user.profile?.firstName} {user.profile?.lastName}
-                </span>
-                <button 
-                  onClick={handleLogout}
-                  className="btn btn-glass"
-                  style={{ 
-                    padding: '0.7rem 1.2rem', 
-                    fontSize: '0.85rem',
-                    border: '1px solid rgba(255, 255, 255, 0.3)'
-                  }}
-                >
-                  Logout
-                </button>
-              </div>
-            ) : (
-              <button 
-                onClick={() => setShowLogin(true)}
-                className="btn btn-health"
-                style={{ 
-                  padding: '0.7rem 1.5rem', 
-                  fontSize: '0.9rem',
-                  boxShadow: '0 4px 15px rgba(0, 212, 170, 0.4)'
-                }}
-              >
-                🏥 Healthcare Login
-              </button>
-            )}
           </div>
-        </div>
-      </header>
+        );
 
-      {/* Main Content */}
-      <main className="main-content">
-        {!user ? (
+      case 'pharmacy-management':
+        return (
+          <div className="module-container">
+            <button className="back-button" onClick={handleBackToHome}>
+              ← Back to Home
+            </button>
+            <div className="module-content">
+              <h2 className="module-title">Pharmacy Management System</h2>
+              <p className="module-description">
+                Real-time medication tracking and prescription management system
+              </p>
+              
+              <div className="auth-tabs">
+                <div className="auth-section">
+                  <h3>Sign Up</h3>
+                  <p className="auth-description">
+                    Enter your DSSN (Digital Social Security Number) to verify your identity
+                  </p>
+                  <div className="form-group">
+                    <label htmlFor="dssn-pharmacy-signup">DSSN Number</label>
+                    <input
+                      type="text"
+                      id="dssn-pharmacy-signup"
+                      placeholder="Enter 15-digit alphanumeric DSSN"
+                      maxLength={15}
+                      pattern="[A-Za-z0-9]{15}"
+                    />
+                    <p className="input-help">15 characters, letters and numbers only</p>
+                    <button 
+                      className="btn btn-medical verify-btn"
+                      onClick={() => {
+                        const dssn = document.getElementById('dssn-pharmacy-signup').value;
+                        if(dssn.length === 15 && /^[A-Za-z0-9]+$/.test(dssn)) {
+                          handleDSSNVerify(dssn);
+                        } else {
+                          alert('Please enter a valid 15-digit alphanumeric DSSN');
+                        }
+                      }}
+                    >
+                      Verify DSSN
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="divider">OR</div>
+                
+                <div className="auth-section">
+                  <h3>Login</h3>
+                  <p className="auth-description">
+                    Access your pharmacy account with DSSN and password
+                  </p>
+                  <div className="form-group">
+                    <label htmlFor="dssn-pharmacy-login">DSSN Number</label>
+                    <input
+                      type="text"
+                      id="dssn-pharmacy-login"
+                      placeholder="Enter your DSSN"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="pharmacy-password">Password</label>
+                    <input
+                      type="password"
+                      id="pharmacy-password"
+                      placeholder="Enter your password"
+                    />
+                  </div>
+                  <button 
+                    className="btn btn-medical login-btn"
+                    onClick={() => {
+                      const dssn = document.getElementById('dssn-pharmacy-login').value;
+                      const password = document.getElementById('pharmacy-password').value;
+                      if(dssn && password) {
+                        handleLogin({ dssn, password });
+                      } else {
+                        alert('Please enter both DSSN and password');
+                      }
+                    }}
+                  >
+                    Login to Pharmacy System
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      default:
+        return (
           <div className="hero-section">
             <div className="hero-text">
               <h1>
@@ -140,12 +257,14 @@ function App() {
               {/* Enhanced Health Features Grid with Floating Animations */}
               <div className="health-features-grid">
                 {/* Patient Records Card */}
-                <div className="health-feature-item floating" style={{
-                  background: 'linear-gradient(135deg, rgba(0, 212, 170, 0.15), rgba(17, 138, 178, 0.1))',
-                  border: '1px solid rgba(0, 212, 170, 0.3)',
-                  backdropFilter: 'blur(20px)',
-                  animationDelay: '0s'
-                }}>
+                <div 
+                  className="health-feature-item floating clickable-card patient-records-card"
+                  onClick={() => handleCardClick('patient-records')}
+                  style={{
+                    animationDelay: '0s',
+                    cursor: 'pointer'
+                  }}
+                >
                   <div className="health-feature-icon" style={{
                     background: 'linear-gradient(135deg, #00d4aa, #118ab2)',
                     boxShadow: '0 8px 25px rgba(0, 212, 170, 0.4)'
@@ -153,16 +272,19 @@ function App() {
                   <div className="health-feature-content">
                     <h4>Patient Records</h4>
                     <p>Secure digital health records with instant access for authorized medical professionals</p>
+                    <span className="card-click-hint">Click to access →</span>
                   </div>
                 </div>
 
                 {/* Pharmacy Management Card */}
-                <div className="health-feature-item floating" style={{
-                  background: 'linear-gradient(135deg, rgba(114, 9, 183, 0.15), rgba(58, 134, 255, 0.1))',
-                  border: '1px solid rgba(114, 9, 183, 0.3)',
-                  backdropFilter: 'blur(20px)',
-                  animationDelay: '0.2s'
-                }}>
+                <div 
+                  className="health-feature-item floating clickable-card pharmacy-card"
+                  onClick={() => handleCardClick('pharmacy-management')}
+                  style={{
+                    animationDelay: '0.2s',
+                    cursor: 'pointer'
+                  }}
+                >
                   <div className="health-feature-icon" style={{
                     background: 'linear-gradient(135deg, #7209b7, #3a86ff)',
                     boxShadow: '0 8px 25px rgba(114, 9, 183, 0.4)'
@@ -170,16 +292,19 @@ function App() {
                   <div className="health-feature-content">
                     <h4>Pharmacy Management</h4>
                     <p>Real-time medication tracking and prescription management system</p>
+                    <span className="card-click-hint">Click to access →</span>
                   </div>
                 </div>
 
                 {/* Telemedicine Card */}
-                <div className="health-feature-item floating" style={{
-                  background: 'linear-gradient(135deg, rgba(239, 71, 111, 0.15), rgba(255, 209, 102, 0.1))',
-                  border: '1px solid rgba(239, 71, 111, 0.3)',
-                  backdropFilter: 'blur(20px)',
-                  animationDelay: '0.4s'
-                }}>
+                <div 
+                  className="health-feature-item floating clickable-card telemedicine-card"
+                  onClick={() => handleCardClick('telemedicine')}
+                  style={{
+                    animationDelay: '0.4s',
+                    cursor: 'pointer'
+                  }}
+                >
                   <div className="health-feature-icon" style={{
                     background: 'linear-gradient(135deg, #ef476f, #ffd166)',
                     boxShadow: '0 8px 25px rgba(239, 71, 111, 0.4)'
@@ -187,16 +312,19 @@ function App() {
                   <div className="health-feature-content">
                     <h4>Telemedicine</h4>
                     <p>Virtual consultations and remote patient monitoring capabilities</p>
+                    <span className="card-click-hint">Coming Soon</span>
                   </div>
                 </div>
 
                 {/* Emergency Response Card */}
-                <div className="health-feature-item floating" style={{
-                  background: 'linear-gradient(135deg, rgba(255, 77, 77, 0.15), rgba(255, 122, 0, 0.1))',
-                  border: '1px solid rgba(255, 77, 77, 0.3)',
-                  backdropFilter: 'blur(20px)',
-                  animationDelay: '0.6s'
-                }}>
+                <div 
+                  className="health-feature-item floating clickable-card emergency-card"
+                  onClick={() => handleCardClick('emergency')}
+                  style={{
+                    animationDelay: '0.6s',
+                    cursor: 'pointer'
+                  }}
+                >
                   <div className="health-feature-icon" style={{
                     background: 'linear-gradient(135deg, #ff4d4d, #ff7a00)',
                     boxShadow: '0 8px 25px rgba(255, 77, 77, 0.4)'
@@ -204,6 +332,7 @@ function App() {
                   <div className="health-feature-content">
                     <h4>Emergency Response</h4>
                     <p>Rapid emergency services coordination and ambulance dispatch</p>
+                    <span className="card-click-hint">Coming Soon</span>
                   </div>
                 </div>
               </div>
@@ -313,6 +442,95 @@ function App() {
               </div>
             </div>
           </div>
+        );
+    }
+  };
+
+  return (
+    <div className="app">
+      {/* Header */}
+      <header className={`header ${scrolled ? 'scrolled' : ''}`}>
+        <div className="header-content">
+          <div className="logo">
+            <span className="logo-icon">🏥</span>
+            <span>Digital Liberia Health</span>
+          </div>
+          
+          {/* Liberia Flag and Login Section */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+            {/* Liberia Flag */}
+            <div 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                background: 'rgba(255, 255, 255, 0.1)',
+                padding: '0.5rem 1rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                backdropFilter: 'blur(10px)'
+              }}
+            >
+              <div style={{ 
+                fontSize: '1.5rem',
+                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))'
+              }}>
+                🇱🇷
+              </div>
+              <span style={{ 
+                color: 'var(--white)', 
+                fontSize: '0.9rem',
+                fontWeight: '600',
+                textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+              }}>
+                Republic of Liberia
+              </span>
+            </div>
+
+            {user ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                <span style={{ 
+                  color: 'var(--white)', 
+                  fontWeight: '600',
+                  fontSize: '0.95rem'
+                }}>
+                  Welcome, Dr. {user.profile?.firstName} {user.profile?.lastName}
+                </span>
+                <button 
+                  onClick={handleLogout}
+                  className="btn btn-glass"
+                  style={{ 
+                    padding: '0.7rem 1.2rem', 
+                    fontSize: '0.85rem',
+                    border: '1px solid rgba(255, 255, 255, 0.3)'
+                  }}
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              !activeModule && (
+                <button 
+                  onClick={() => setShowLogin(true)}
+                  className="btn btn-health"
+                  style={{ 
+                    padding: '0.7rem 1.5rem', 
+                    fontSize: '0.9rem',
+                    boxShadow: '0 4px 15px rgba(0, 212, 170, 0.4)'
+                  }}
+                >
+                  🏥 Healthcare Login
+                </button>
+              )
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="main-content">
+        {!user ? (
+          renderModuleContent()
         ) : (
           <div style={{ 
             width: '100%', 
