@@ -1,0 +1,321 @@
+/* App-specific styles */
+
+.app-link {
+  color: #00d4aa;
+  text-decoration: underline;
+  margin-top: 10px;
+  display: inline-block;
+}
+
+.app-link:hover {
+  color: #118ab2;
+}
+
+/* Professional Card Variants */
+.health-action-card.doctor-card {
+  background: linear-gradient(135deg, rgba(0, 132, 227, 0.15), rgba(9, 132, 227, 0.1)) !important;
+  border: 1px solid rgba(0, 132, 227, 0.3) !important;
+}
+
+.health-action-card.nurse-card {
+  background: linear-gradient(135deg, rgba(0, 206, 201, 0.15), rgba(0, 206, 201, 0.1)) !important;
+  border: 1px solid rgba(0, 206, 201, 0.3) !important;
+}
+
+.health-action-card.pharmacist-card {
+  background: linear-gradient(135deg, rgba(108, 92, 231, 0.15), rgba(108, 92, 231, 0.1)) !important;
+  border: 1px solid rgba(108, 92, 231, 0.3) !important;
+}
+
+/* Professional type colors in dashboard */
+.professional-badge.doctor {
+  background: rgba(9, 132, 227, 0.1);
+  border-color: rgba(9, 132, 227, 0.3);
+}
+
+.professional-badge.nurse {
+  background: rgba(0, 206, 201, 0.1);
+  border-color: rgba(0, 206, 201, 0.3);
+}
+
+.professional-badge.pharmacist {
+  background: rgba(108, 92, 231, 0.1);
+  border-color: rgba(108, 92, 231, 0.3);
+}
+
+/* Status indicators */
+.status-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 5px;
+}
+
+.status-active {
+  background-color: #00d4aa;
+  box-shadow: 0 0 10px #00d4aa;
+}
+
+.status-pending {
+  background-color: #ffd166;
+  box-shadow: 0 0 10px #ffd166;
+}
+
+.status-inactive {
+  background-color: #6c757d;
+}
+
+/* Loading overlay improvements */
+.global-loading-overlay {
+  z-index: 10000;
+}
+
+.global-loading-overlay .global-spinner {
+  width: 80px;
+  height: 80px;
+}
+
+/* Form validation styles */
+.input-error {
+  border-color: #ef476f !important;
+  background-color: rgba(239, 71, 111, 0.05) !important;
+}
+
+.error-text {
+  color: #ef476f;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Session timeout warning */
+.session-warning {
+  background: linear-gradient(135deg, rgba(255, 209, 102, 0.15), rgba(255, 209, 102, 0.1));
+  border: 1px solid rgba(255, 209, 102, 0.3);
+  color: #ffd166;
+  padding: 1rem;
+  border-radius: 10px;
+  margin: 1rem 0;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  animation: pulse-warning 2s infinite;
+}
+
+@keyframes pulse-warning {
+  0%, 100% { 
+    box-shadow: 0 0 15px rgba(255, 209, 102, 0.3);
+  }
+  50% { 
+    box-shadow: 0 0 25px rgba(255, 209, 102, 0.5);
+  }
+}
+
+/* Mobile notification prompt */
+.notification-prompt {
+  background: linear-gradient(135deg, rgba(138, 43, 226, 0.15), rgba(75, 0, 130, 0.1));
+  border: 1px solid rgba(138, 43, 226, 0.3);
+  color: #8a2be2;
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin: 1rem 0;
+  text-align: center;
+}
+
+.notification-prompt h4 {
+  margin-top: 0;
+  color: #8a2be2;
+}
+
+/* Professional registration progress */
+.registration-progress {
+  display: flex;
+  justify-content: space-between;
+  margin: 2rem 0;
+  position: relative;
+}
+
+.registration-progress::before {
+  content: '';
+  position: absolute;
+  top: 20px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.2);
+  z-index: 1;
+}
+
+.progress-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 2;
+  position: relative;
+}
+
+.progress-step.active .step-circle {
+  background: var(--success-color);
+  color: white;
+  transform: scale(1.2);
+}
+
+.progress-step.completed .step-circle {
+  background: var(--success-color);
+  color: white;
+}
+
+.step-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+  transition: all 0.3s ease;
+}
+
+.step-label {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+/* Professional license validation */
+.license-validation {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.license-valid {
+  color: #00d4aa;
+}
+
+.license-expired {
+  color: #ef476f;
+}
+
+/* Enhanced tooltips */
+.tooltip {
+  position: relative;
+  display: inline-block;
+}
+
+.tooltip .tooltip-text {
+  visibility: hidden;
+  width: 200px;
+  background-color: rgba(0, 0, 0, 0.9);
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 5px;
+  position: absolute;
+  z-index: 1;
+  bottom: 125%;
+  left: 50%;
+  margin-left: -100px;
+  opacity: 0;
+  transition: opacity 0.3s;
+  font-size: 0.85rem;
+}
+
+.tooltip:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Print styles for patient records */
+@media print {
+  .header,
+  .hero-actions,
+  .btn,
+  .back-button {
+    display: none !important;
+  }
+  
+  .module-content {
+    box-shadow: none !important;
+    border: none !important;
+    background: white !important;
+    color: black !important;
+  }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  :root {
+    --text-dark: #000000;
+    --text-light: #333333;
+    --white: #ffffff;
+    --black: #000000;
+  }
+  
+  .btn {
+    border: 2px solid currentColor;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text-dark: #ffffff;
+    --text-light: #b0b0b0;
+    --card-bg: rgba(30, 30, 30, 0.95);
+  }
+  
+  body {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  }
+  
+  .module-content,
+  .professional-modal,
+  .dashboard-container,
+  .health-action-card {
+    background: rgba(30, 30, 30, 0.95);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: var(--text-dark);
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .btn {
+    padding: 1.5rem 3rem;
+    min-height: 60px;
+  }
+  
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    font-size: 16px; /* Prevents iOS zoom */
+  }
+  
+  .clickable-card:hover {
+    transform: none !important;
+  }
+}
