@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn }) => {
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState({
-        dssn: userDssn || '', // Added DSSN field
+        dssn: userDssn || '',
         professionalType: '',
         specialization: '',
         licenseNumber: '',
@@ -16,10 +16,32 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
+    const [userInfo, setUserInfo] = useState(null);
 
-    // Frontend validation before sending
+    // Fetch user info when DSSN is provided
+    useEffect(() => {
+        if (userDssn && userDssn.length >= 15) {
+            setFormData(prev => ({ ...prev, dssn: userDssn }));
+            fetchUserInfo(userDssn);
+        }
+    }, [userDssn]);
+
+    const fetchUserInfo = async (dssn) => {
+        try {
+            const response = await axios.post(
+                `${process.env.REACT_APP_HEALTH_API_URL || 'https://libpayapp.liberianpost.com:8081/api/health'}/verify-dssn/patient`,
+                { dssn }
+            );
+            if (response.data.success && response.data.user) {
+                setUserInfo(response.data.user);
+            }
+        } catch (error) {
+            console.log('Could not fetch user info:', error);
+        }
+    };
+
     const validateForm = () => {
-        // Validate DSSN (REQUIRED - from backend validation)
+        // Validate DSSN
         if (!formData.dssn || formData.dssn.trim() === '') {
             return { valid: false, message: 'DSSN is required. Please enter your Digital Social Security Number.' };
         } else if (formData.dssn.length < 15 || formData.dssn.length > 20) {
@@ -43,14 +65,11 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
         // Check if license is expired
         const expiryDate = new Date(formData.licenseExpiry);
         const today = new Date();
-        today.setHours(0, 0, 0, 0); // Reset time part for comparison
+        today.setHours(0, 0, 0, 0);
         
         if (expiryDate < today) {
             return { valid: false, message: 'License cannot be expired. Please enter a future date.' };
         }
-
-        // Note: facilityName is optional in backend (marked as optional())
-        // facilityType has default value 'hospital' in backend
 
         return { valid: true };
     };
@@ -59,7 +78,6 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
         setLoading(true);
         setError(null);
         
-        // Frontend validation
         const validation = validateForm();
         if (!validation.valid) {
             setError(validation.message);
@@ -68,12 +86,10 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
         }
 
         try {
-            // Format the date properly
             const formattedExpiry = new Date(formData.licenseExpiry).toISOString().split('T')[0];
             
-            // Prepare the request data - INCLUDING DSSN
             const requestData = { 
-                dssn: formData.dssn.trim(), // Send DSSN from form
+                dssn: formData.dssn.trim(),
                 professionalType: formData.professionalType,
                 specialization: formData.specialization || null,
                 licenseNumber: formData.licenseNumber.trim(),
@@ -83,31 +99,25 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                 department: formData.department.trim() || null
             };
 
-            console.log('Sending registration data:', requestData);
-            console.log('API URL:', `${process.env.REACT_APP_HEALTH_API_URL || 'https://libpayapp.liberianpost.com:8081/api/health'}/register-professional`);
-
-            // Send the request WITHOUT authorization headers
             const response = await axios.post(
                 `${process.env.REACT_APP_HEALTH_API_URL || 'https://libpayapp.liberianpost.com:8081/api/health'}/register-professional`,
                 requestData
-                // No headers needed - endpoint is public
             );
 
-            console.log('Registration response:', response.data);
-            
             if (response.data.success) {
-                setSuccess('Professional registration submitted for verification');
+                setSuccess({
+                    title: 'Registration Submitted Successfully!',
+                    message: response.data.message,
+                    nextSteps: response.data.nextSteps,
+                    professionalId: response.data.professionalId
+                });
                 setStep(3);
                 if (onSuccess) onSuccess();
             }
         } catch (err) {
             console.error('Registration error:', err);
-            console.error('Error response data:', err.response?.data);
-            console.error('Error status:', err.response?.status);
             
-            // Enhanced error handling
             if (err.response?.data?.errors) {
-                // Show validation errors from backend
                 const validationErrors = err.response.data.errors.map(err => err.msg).join(', ');
                 setError(`Validation errors: ${validationErrors}`);
             } else if (err.response?.data?.message?.includes('No user found with this DSSN')) {
@@ -123,7 +133,7 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                             href="https://digitalliberia.app" 
                             target="_blank" 
                             rel="noopener noreferrer"
-                            style={{ color: '#00d4aa', textDecoration: 'underline', marginTop: '10px', display: 'inline-block' }}
+                            className="app-link"
                         >
                             Download Digital Liberia App →
                         </a>
@@ -174,20 +184,20 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
     };
 
     const handleInputChange = (field, value) => {
-        setFormData(prev => ({
-            ...prev,
-            [field]: value
-        }));
-        
-        // Clear error when user starts typing
-        if (error) {
-            setError(null);
-        }
+        setFormData(prev => ({ ...prev, [field]: value }));
+        if (error) setError(null);
     };
 
     const handleDssnChange = (e) => {
-        const value = e.target.value.toUpperCase(); // Convert to uppercase for consistency
+        const value = e.target.value.toUpperCase();
         handleInputChange('dssn', value);
+        
+        // Auto-fetch user info when DSSN is valid
+        if (value.length >= 15 && /^[A-Za-z0-9]{15,20}$/.test(value)) {
+            fetchUserInfo(value);
+        } else {
+            setUserInfo(null);
+        }
     };
 
     if (!isOpen) return null;
@@ -200,18 +210,15 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                     <button className="modal-close" onClick={onClose}>×</button>
                 </div>
                 
+                {/* Step 1: DSSN & Basic Info */}
                 {step === 1 && (
                     <div className="verification-step">
                         <h3>Step 1: DSSN & Professional Information</h3>
                         <p className="step-description">
                             Enter your DSSN and professional details for verification
-                            <br />
-                            <small style={{ color: '#ef476f', marginTop: '5px', display: 'block' }}>
-                                <strong>Important:</strong> You must have a registered DSSN from the Digital Liberia app
-                            </small>
                         </p>
                         
-                        {/* DSSN FIELD ADDED HERE */}
+                        {/* DSSN Input with User Info */}
                         <div className="form-group">
                             <label>Digital Social Security Number (DSSN) *</label>
                             <input 
@@ -228,12 +235,21 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                             />
                             <p className="input-help">
                                 Your DSSN from the Digital Liberia app (letters and numbers only)
-                                {userDssn && (
-                                    <span style={{ color: '#00d4aa', fontWeight: 'bold' }}>
-                                        &nbsp;• Detected DSSN: {userDssn}
-                                    </span>
-                                )}
                             </p>
+                            
+                            {/* User Info Display */}
+                            {userInfo && (
+                                <div className="user-info-display">
+                                    <div className="user-info-header">
+                                        ✅ User Found
+                                    </div>
+                                    <div className="user-info-content">
+                                        <p><strong>Name:</strong> {userInfo.firstName} {userInfo.lastName}</p>
+                                        <p><strong>Email:</strong> {userInfo.email}</p>
+                                        <p><strong>Phone:</strong> {userInfo.phone}</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         
                         <div className="form-group">
@@ -274,9 +290,7 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                                 onChange={(e) => handleInputChange('licenseNumber', e.target.value)}
                                 className="form-input"
                                 required
-                                minLength="3"
                             />
-                            <p className="input-help">e.g., MED123456, LIC789012</p>
                         </div>
                         
                         <div className="form-group">
@@ -287,16 +301,14 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                                 onChange={(e) => handleInputChange('licenseExpiry', e.target.value)}
                                 className="form-input"
                                 required
-                                min={new Date().toISOString().split('T')[0]} // Today's date
+                                min={new Date().toISOString().split('T')[0]}
                             />
-                            <p className="input-help">License must not be expired</p>
                         </div>
                         
                         <div className="form-actions">
                             <button 
                                 className="btn btn-health"
                                 onClick={() => {
-                                    // Validate DSSN before moving to next step
                                     if (!formData.dssn || formData.dssn.length < 15) {
                                         setError('Please enter a valid DSSN (15-20 characters)');
                                         return;
@@ -308,7 +320,6 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                                     setError(null);
                                     setStep(2);
                                 }}
-                                disabled={!formData.dssn || formData.dssn.length < 15 || !formData.professionalType || !formData.licenseNumber || !formData.licenseExpiry}
                             >
                                 Next: Facility Information →
                             </button>
@@ -316,15 +327,12 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                     </div>
                 )}
 
+                {/* Step 2: Facility Information */}
                 {step === 2 && (
                     <div className="verification-step">
                         <h3>Step 2: Facility Information</h3>
                         <p className="step-description">
                             Please provide details about your healthcare facility
-                            <br />
-                            <small style={{ color: '#00d4aa', marginTop: '5px', display: 'block' }}>
-                                DSSN: <strong>{formData.dssn}</strong>
-                            </small>
                         </p>
                         
                         <div className="form-group">
@@ -341,7 +349,6 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                                 <option value="private_practice">Private Practice</option>
                                 <option value="government">Government Health Facility</option>
                             </select>
-                            <p className="input-help">Optional - Default is "Hospital"</p>
                         </div>
                         
                         <div className="form-group">
@@ -353,7 +360,6 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                                 onChange={(e) => handleInputChange('facilityName', e.target.value)}
                                 className="form-input"
                             />
-                            <p className="input-help">Optional - Leave blank if not applicable</p>
                         </div>
                         
                         <div className="form-group">
@@ -367,18 +373,39 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                             />
                         </div>
                         
-                        <div className="dssn-review" style={{ 
-                            backgroundColor: '#f5f5f5', 
-                            padding: '15px', 
-                            borderRadius: '8px',
-                            margin: '20px 0',
-                            borderLeft: '4px solid #00d4aa'
-                        }}>
-                            <h4 style={{ marginTop: 0, color: '#333' }}>Registration Summary</h4>
-                            <p><strong>DSSN:</strong> {formData.dssn}</p>
-                            <p><strong>Professional Type:</strong> {formData.professionalType}</p>
-                            <p><strong>License Number:</strong> {formData.licenseNumber}</p>
-                            <p><strong>License Expiry:</strong> {new Date(formData.licenseExpiry).toLocaleDateString()}</p>
+                        {/* Registration Summary */}
+                        <div className="registration-summary">
+                            <h4>Registration Summary</h4>
+                            <div className="summary-grid">
+                                <div className="summary-item">
+                                    <strong>DSSN:</strong>
+                                    <span>{formData.dssn}</span>
+                                </div>
+                                <div className="summary-item">
+                                    <strong>Professional Type:</strong>
+                                    <span>{formData.professionalType}</span>
+                                </div>
+                                <div className="summary-item">
+                                    <strong>License Number:</strong>
+                                    <span>{formData.licenseNumber}</span>
+                                </div>
+                                <div className="summary-item">
+                                    <strong>License Expiry:</strong>
+                                    <span>{new Date(formData.licenseExpiry).toLocaleDateString()}</span>
+                                </div>
+                                {userInfo && (
+                                    <>
+                                        <div className="summary-item">
+                                            <strong>Name:</strong>
+                                            <span>{userInfo.firstName} {userInfo.lastName}</span>
+                                        </div>
+                                        <div className="summary-item">
+                                            <strong>Email:</strong>
+                                            <span>{userInfo.email}</span>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                         </div>
                         
                         <div className="form-actions">
@@ -388,7 +415,7 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                                     onClick={() => setStep(1)}
                                     disabled={loading}
                                 >
-                                    ← Back to DSSN & Details
+                                    ← Back
                                 </button>
                                 <button 
                                     className="btn btn-health"
@@ -398,71 +425,86 @@ const ProfessionalVerificationModal = ({ isOpen, onClose, onSuccess, userDssn })
                                     {loading ? (
                                         <>
                                             <span className="spinner-small"></span>
-                                            Submitting Registration...
+                                            Submitting...
                                         </>
-                                    ) : 'Submit Professional Registration'}
+                                    ) : 'Submit Registration'}
                                 </button>
                             </div>
                         </div>
                     </div>
                 )}
 
+                {/* Step 3: Success */}
                 {step === 3 && (
                     <div className="verification-step success-step">
                         <div className="success-icon">✅</div>
-                        <h3>Registration Submitted Successfully!</h3>
-                        <p>
-                            Your professional registration for DSSN: <strong>{formData.dssn}</strong> has been submitted for verification.
+                        <h3>{success?.title || 'Registration Successful!'}</h3>
+                        <p className="success-message">
+                            {success?.message || 'Your professional registration has been submitted for verification.'}
                         </p>
-                        <p>
-                            <strong>Verification Process:</strong>
-                        </p>
-                        <ul className="verification-steps">
-                            <li>✅ Registration received for DSSN: {formData.dssn}</li>
-                            <li>⏳ Administrative review (3-5 business days)</li>
-                            <li>📧 Email notification upon approval</li>
-                            <li>🔓 Access granted to healthcare systems</li>
-                        </ul>
-                        <p>
-                            <strong>After Approval:</strong>
-                        </p>
-                        <ul className="verification-steps">
-                            <li>✅ Login with DSSN + Password (from Digital Liberia app)</li>
-                            <li>📱 OR approve via mobile notification</li>
-                            <li>🏥 Access healthcare systems</li>
-                        </ul>
-                        <div className="button-group">
+                        
+                        <div className="success-details">
+                            <div className="detail-card">
+                                <div className="detail-icon">📝</div>
+                                <h4>Registration ID</h4>
+                                <p className="detail-value">{success?.professionalId || 'Pending'}</p>
+                            </div>
+                            
+                            <div className="detail-card">
+                                <div className="detail-icon">⏳</div>
+                                <h4>Verification Time</h4>
+                                <p className="detail-value">3-5 Business Days</p>
+                            </div>
+                            
+                            <div className="detail-card">
+                                <div className="detail-icon">📧</div>
+                                <h4>Notification</h4>
+                                <p className="detail-value">Email upon approval</p>
+                            </div>
+                        </div>
+                        
+                        <div className="next-steps">
+                            <h4>Next Steps:</h4>
+                            <ul className="steps-list">
+                                <li>✅ Registration submitted for DSSN: {formData.dssn}</li>
+                                <li>⏳ Administrative review (3-5 business days)</li>
+                                <li>📧 You will receive email notification upon approval</li>
+                                <li>🔓 Once approved, login with DSSN + Password</li>
+                                <li>📱 OR approve access via mobile notification</li>
+                            </ul>
+                        </div>
+                        
+                        <div className="action-buttons">
                             <button 
                                 className="btn btn-health"
                                 onClick={onClose}
                             >
                                 Close
                             </button>
+                            <a 
+                                href="https://digitalliberia.app"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-mobile"
+                            >
+                                Download Mobile App
+                            </a>
                         </div>
                     </div>
                 )}
 
+                {/* Error Display */}
                 {error && (
                     <div className="error-message">
                         <div className="error-icon">⚠️</div>
                         <div className="error-content">
                             {error}
                             <button 
-                                className="btn btn-small"
+                                className="btn btn-small btn-error"
                                 onClick={() => setError(null)}
-                                style={{ marginLeft: '10px', fontSize: '0.8rem', padding: '5px 10px' }}
                             >
                                 Dismiss
                             </button>
-                        </div>
-                    </div>
-                )}
-                
-                {success && (
-                    <div className="success-message">
-                        <div className="success-icon">✅</div>
-                        <div className="success-content">
-                            {success}
                         </div>
                     </div>
                 )}
